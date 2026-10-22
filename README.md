@@ -150,8 +150,7 @@ changement.
 
 ## <img src="web/public/art/autocollants/bonbon.png" width="30" align="top"> Crédits
 
-Les illustrations de Ruruka utilisées dans l'application et dans ce README (portraits,
-autocollants, dos de carte) viennent de
+Les illustrations de Ruruka utilisées dans l'application et dans ce README viennent de
 [cette publication Danbooru](https://danbooru.donmai.us/posts/12428118). Merci à leur auteur·ice !
 
 ---
