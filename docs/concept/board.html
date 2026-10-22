@@ -1,0 +1,297 @@
+<!doctype html>
+<!-- Planche de concept v2 "Le carnet magique" : source de concept-art.png -->
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Ruruka — Le carnet magique</title>
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Courier+Prime&family=Mochiy+Pop+One&family=Nunito:wght@500;700;800;900&family=Patrick+Hand&display=block"
+/>
+<style>
+  /* <-- Design tokens (ceux qu'utilisera l'app) --> */
+  :root {
+    --milk: #fbf7ef;
+    --collar: #eee7da;
+    --mauve: #d9c6e2;
+    --lilac: #a98bc4;
+    --plum: #5e3f61;
+    --plumInk: #2b1e30;
+    --star: #f4c542;
+    --blond: #f6e3a8;
+    --strawberry: #f28ba8;
+    --thread: #d8433b;
+    --sky: #8fcbe6;
+    --fontTitle: 'Mochiy Pop One', sans-serif;
+    --fontText: 'Nunito', sans-serif;
+    --fontHand: 'Patrick Hand', cursive;
+    --fontFile: 'Courier Prime', monospace;
+    --outline: 2px solid var(--plumInk);
+    --stickerShadow: 3px 3px 0 var(--plumInk);
+    --notebookDots: radial-gradient(rgb(169 139 196 / 0.35) 1.2px, transparent 1.4px) 0 0 / 22px 22px;
+    --screentone: radial-gradient(rgb(94 63 97 / 0.22) 1.3px, transparent 1.6px) 0 0 / 6px 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    padding: 40px 48px;
+    background: var(--notebookDots), var(--milk);
+    color: var(--plumInk);
+    font-family: var(--fontText);
+    font-size: 13px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* <-- Formes de fond : aplats pastel, pas de dégradé --> */
+  .blob { position: absolute; border-radius: 50%; z-index: 0; }
+  .blob.one { width: 520px; height: 520px; right: -160px; top: -200px; background: var(--mauve); opacity: 0.55; }
+  .blob.two { width: 280px; height: 280px; left: -110px; bottom: -120px; background: var(--blond); opacity: 0.7; }
+
+  .board { position: relative; z-index: 1; display: grid; grid-template-columns: 730px minmax(0, 1fr); gap: 26px 44px; height: 100%; }
+
+  /* <-- Éléments partagés --> */
+  .kira { display: inline-block; width: 18px; height: 18px; fill: var(--star); stroke: var(--plumInk); stroke-width: 1.2; vertical-align: -3px; }
+  .tag { font-family: var(--fontHand); font-size: 18px; color: var(--plum); }
+  .tag b { font-family: var(--fontTitle); font-weight: 400; font-size: 13px; color: var(--plumInk); background: var(--star); border: var(--outline); border-radius: 999px; padding: 1px 9px; margin-right: 8px; box-shadow: 2px 2px 0 var(--plumInk); }
+  .tape { position: absolute; width: 70px; height: 20px; background: rgb(242 139 168 / 0.75); transform: rotate(-6deg); }
+  .tape.sky { background: rgb(143 203 230 / 0.8); }
+  .tape.yellow { background: rgb(244 197 66 / 0.75); }
+
+  /* <-- En-tête --> */
+  header { display: flex; flex-direction: column; gap: 8px; }
+  header .file { font-family: var(--fontFile); font-size: 11px; color: var(--plum); letter-spacing: 0.06em; }
+  h1 { font-family: var(--fontTitle); font-weight: 400; font-size: 66px; line-height: 1.02; letter-spacing: -0.01em; color: var(--plumInk); }
+  h1 .hl { position: relative; z-index: 0; }
+  h1 .hl::before { content: ''; position: absolute; left: -4px; right: -6px; bottom: 6px; height: 22px; background: var(--star); z-index: -1; transform: rotate(-1.5deg); border-radius: 4px; }
+  h1 .kira { width: 34px; height: 34px; vertical-align: 18px; }
+  header p { font-family: var(--fontHand); font-size: 21px; line-height: 1.25; color: var(--plum); max-width: 600px; }
+
+  /* <-- Palette en pastilles-autocollants --> */
+  .palette { display: flex; flex-direction: column; gap: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 12px 10px; }
+  .chip { width: 62px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .chip i { width: 54px; height: 54px; border-radius: 50%; border: var(--outline); box-shadow: var(--stickerShadow); }
+  .chip:nth-child(odd) i { transform: rotate(-4deg); }
+  .chip b { font-weight: 800; font-size: 10.5px; text-align: center; line-height: 1.1; }
+  .chip span { font-family: var(--fontFile); font-size: 9.5px; color: var(--plum); }
+
+  /* <-- Typographie sur une page de carnet --> */
+  .typeCard { position: relative; padding: 18px 20px 16px; background: #fff; border: var(--outline); border-radius: 14px; box-shadow: var(--stickerShadow); transform: rotate(0.8deg); display: flex; flex-direction: column; gap: 8px; }
+  .typeCard .tape { top: -10px; left: 40%; }
+  .sample { display: grid; grid-template-columns: 112px 1fr; align-items: baseline; gap: 10px; }
+  .sample small { font-family: var(--fontFile); font-size: 10px; color: var(--plum); }
+  .sample .title { font-family: var(--fontTitle); font-size: 21px; white-space: nowrap; }
+  .sample .text { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .sample .hand { font-family: var(--fontHand); font-size: 21px; color: var(--plum); white-space: nowrap; }
+  .sample .file { font-family: var(--fontFile); font-size: 12.5px; }
+
+  /* <-- Motif I : carte à collectionner --> */
+  .card {
+    position: relative; width: 158px; height: 238px; padding: 9px; background: var(--collar);
+    border: var(--outline); border-radius: 14px; box-shadow: var(--stickerShadow); transform: rotate(-3deg);
+  }
+  .card::before { content: ''; position: absolute; inset: 5px; border: 1.5px dashed var(--star); border-radius: 10px; pointer-events: none; }
+  .card .badge { position: absolute; top: -14px; left: 50%; width: 44px; height: 44px; margin-left: -22px; }
+  .card .badge svg { width: 100%; height: 100%; fill: var(--star); stroke: var(--plumInk); stroke-width: 1.2; }
+  .card .badge span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--fontTitle); font-size: 11px; padding-top: 3px; }
+  .slot {
+    display: grid; place-items: center; text-align: center; border-radius: 8px;
+    background: var(--screentone), var(--mauve); border: 1.5px solid var(--plumInk);
+    color: var(--plum); font-family: var(--fontHand); font-size: 14px; line-height: 1.15;
+  }
+  .card .slot { height: 162px; margin-top: 18px; }
+  .card .name { text-align: center; font-family: var(--fontTitle); font-size: 13.5px; margin-top: 8px; }
+  .card .shine { position: absolute; right: 12px; top: 34px; width: 22px; height: 22px; }
+
+  /* <-- Motif II : page du carnet d'enquête --> */
+  .page { position: relative; width: 250px; padding: 22px 18px 16px; background: #fff; border: var(--outline); border-radius: 6px 14px 14px 6px; box-shadow: var(--stickerShadow);
+    background-image: repeating-linear-gradient(transparent 0 25px, rgb(143 203 230 / 0.6) 25px 26px); background-position: 0 8px; }
+  .page::before { content: ''; position: absolute; left: 30px; top: 0; bottom: 0; width: 1.5px; background: rgb(242 139 168 / 0.7); }
+  .page .line { font-family: var(--fontHand); font-size: 17px; line-height: 26px; padding-left: 22px; }
+  .page .circled { border: 2px solid var(--thread); border-radius: 50% 45% 55% 48%; padding: 0 6px; }
+  .page .tape { top: -10px; right: 24px; }
+  .stampDone { position: absolute; right: -14px; bottom: 10px; padding: 3px 12px; border: 3px solid var(--thread); border-radius: 10px; color: var(--thread); font-family: var(--fontTitle); font-size: 15px; transform: rotate(-12deg); background: rgb(255 255 255 / 0.85); }
+
+  /* <-- Motif III : fil de laine --> */
+  .yarn { position: relative; width: 240px; height: 140px; }
+  .yarn svg.lines { position: absolute; inset: 0; }
+  .polaroid { position: absolute; width: 68px; padding: 5px 5px 18px; background: #fff; border: var(--outline); box-shadow: var(--stickerShadow); }
+  .polaroid .slot { height: 54px; font-size: 12px; }
+  .polaroid span { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-family: var(--fontHand); font-size: 12px; }
+  .pin { position: absolute; top: -9px; left: 50%; width: 16px; height: 16px; margin-left: -8px; }
+  .pin svg { width: 100%; height: 100%; fill: var(--strawberry); stroke: var(--plumInk); stroke-width: 1.4; }
+
+  /* <-- Motif IV : bulle de Mashutan + étincelles --> */
+  .bubble { position: relative; width: 260px; padding: 12px 16px; background: #fff; border: var(--outline); border-radius: 22px; box-shadow: var(--stickerShadow); font-family: var(--fontHand); font-size: 19px; line-height: 1.15; }
+  .bubble::after { content: ''; position: absolute; left: 34px; bottom: -13px; width: 20px; height: 20px; background: #fff; border-right: var(--outline); border-bottom: var(--outline); transform: rotate(45deg); }
+  .bubble small { display: block; font-family: var(--fontTitle); font-size: 11px; color: var(--strawberry); margin-top: 4px; }
+  .speed { position: relative; height: 70px; border-radius: 12px; overflow: hidden; border: var(--outline); background: repeating-conic-gradient(from 0deg at 50% 50%, var(--blond) 0deg 6deg, #fff 6deg 12deg); display: grid; place-items: center; }
+  .speed b { font-family: var(--fontTitle); font-weight: 400; font-size: 18px; background: #fff; padding: 2px 14px; border: var(--outline); border-radius: 999px; transform: rotate(-3deg); }
+
+  .motifs { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 32px; align-items: start; }
+  .motifRow { grid-column: 1 / 3; display: grid; grid-template-columns: 170px 262px minmax(0, 1fr); gap: 26px; align-items: start; margin-top: 8px; }
+  .motif { display: flex; flex-direction: column; gap: 18px; }
+
+  /* <-- Aperçu de l'Accueil --> */
+  .preview { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .app { position: relative; flex: 1; display: grid; grid-template-columns: 150px minmax(0, 1fr); background: var(--milk); border: var(--outline); border-radius: 18px; box-shadow: 6px 6px 0 var(--plumInk); overflow: hidden; }
+  .spine { padding: 18px 0 18px 14px; background: var(--mauve); border-right: var(--outline); display: flex; flex-direction: column; gap: 6px; }
+  .spine .logo { font-family: var(--fontTitle); font-size: 24px; margin: 0 0 12px 2px; }
+  .spine .logo .kira { width: 16px; height: 16px; vertical-align: 12px; }
+  .navTab { position: relative; padding: 7px 12px; font-weight: 800; font-size: 13px; border-radius: 12px 0 0 12px; color: var(--plum); }
+  .navTab.on { background: var(--milk); color: var(--plumInk); border: var(--outline); border-right: 0; margin-right: -2px; }
+  .navTab.on::before { content: ''; position: absolute; left: -9px; top: 50%; width: 12px; height: 12px; margin-top: -6px; background: var(--strawberry); border: var(--outline); border-radius: 50%; }
+  .navTab .count { float: right; margin-right: 10px; font-family: var(--fontTitle); font-size: 10px; background: var(--strawberry); color: #fff; border: 1.5px solid var(--plumInk); border-radius: 999px; padding: 0 6px; }
+
+  .main { padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: 14px 22px; align-content: start; background: var(--notebookDots); }
+  .hello { grid-column: 1 / 3; font-family: var(--fontTitle); font-size: 30px; }
+  .hello small { display: block; font-family: var(--fontHand); font-size: 18px; color: var(--plum); }
+  .hero { position: relative; height: 170px; border: var(--outline); border-radius: 16px; overflow: hidden; box-shadow: var(--stickerShadow); }
+  .hero .slot { height: 100%; border: 0; border-radius: 0; background: var(--screentone), var(--sky); align-items: start; padding-top: 12px; }
+  .hero .over { position: absolute; left: 14px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .hero .over em { font-family: var(--fontTitle); font-style: normal; font-size: 24px; background: #fff; padding: 2px 12px; border: var(--outline); border-radius: 10px; }
+  .play { font-family: var(--fontTitle); font-size: 13px; background: var(--star); padding: 5px 14px; border: var(--outline); border-radius: 999px; box-shadow: 2px 2px 0 var(--plumInk); }
+  .main .card { grid-column: 2; grid-row: 2 / 4; width: 150px; height: 228px; transform: rotate(4deg); margin-top: 6px; }
+  .main .card .slot { height: 150px; }
+  .rows { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: grid; grid-template-columns: 22px 34px minmax(0, 1fr) 60px auto; align-items: center; gap: 10px; padding: 7px 10px; background: #fff; border: var(--outline); border-radius: 12px; }
+  .row:nth-child(2) { transform: rotate(-0.6deg); }
+  .row .check { width: 20px; height: 20px; }
+  .row .thumb { height: 40px; font-size: 9px; border-radius: 6px; }
+  .row strong { font-weight: 800; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .ep { font-family: var(--fontFile); font-size: 11px; color: var(--plum); }
+  .row .go { font-family: var(--fontTitle); font-size: 11px; padding: 3px 10px; border: var(--outline); border-radius: 999px; background: var(--star); }
+  .row .go.alt { background: var(--sky); }
+  .preview .bubble { position: absolute; right: 26px; bottom: 34px; width: 230px; transform: rotate(-2deg); }
+  .floatKira { position: absolute; width: 30px; height: 30px; }
+</style>
+</head>
+<body>
+<div class="blob one"></div>
+<div class="blob two"></div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <path id="kira" d="M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z" />
+    <path id="star5" d="M24 3 L29.6 17.3 L45 18 L33 27.6 L37.2 42.6 L24 34 L10.8 42.6 L15 27.6 L3 18 L18.4 17.3Z" />
+    <path id="heart" d="M12 21 C5 15.5 2 12 2 8 C2 5 4.5 3 7 3 C9 3 11 4.2 12 6 C13 4.2 15 3 17 3 C19.5 3 22 5 22 8 C22 12 19 15.5 12 21Z" />
+  </defs>
+</svg>
+
+<div class="board">
+  <div>
+    <header>
+      <span class="file">CARNET N° 1999 · DIRECTION ARTISTIQUE v2</span>
+      <h1>Le carnet <span class="hl">magique</span> <svg class="kira" viewBox="0 0 24 24"><use href="#kira" /></svg><br />de Ruruka</h1>
+      <p>Le carnet d'enquête d'une petite magical girl en 1999 : autocollants, paillettes, trames de manga, fil de laine et notes griffonnées. Joyeux, vivant, mais toujours un mystère à résoudre.</p>
+    </header>
+
+    <section class="motifs" style="margin-top: 22px">
+      <div class="palette">
+        <span class="tag"><b>I</b>Palette « allumée »</span>
+        <div class="chips">
+          <div class="chip"><i style="background:#fbf7ef"></i><b>Lait</b><span>#FBF7EF</span></div>
+          <div class="chip"><i style="background:#eee7da"></i><b>Col blanc</b><span>#EEE7DA</span></div>
+          <div class="chip"><i style="background:#d9c6e2"></i><b>Mauve</b><span>#D9C6E2</span></div>
+          <div class="chip"><i style="background:#a98bc4"></i><b>Lilas</b><span>#A98BC4</span></div>
+          <div class="chip"><i style="background:#5e3f61"></i><b>Prune</b><span>#5E3F61</span></div>
+          <div class="chip"><i style="background:#2b1e30"></i><b>Encre prune</b><span>#2B1E30</span></div>
+          <div class="chip"><i style="background:#f4c542"></i><b>Or étoile</b><span>#F4C542</span></div>
+          <div class="chip"><i style="background:#f6e3a8"></i><b>Blond</b><span>#F6E3A8</span></div>
+          <div class="chip"><i style="background:#f28ba8"></i><b>Fraise</b><span>#F28BA8</span></div>
+          <div class="chip"><i style="background:#d8433b"></i><b>Fil rouge</b><span>#D8433B</span></div>
+          <div class="chip"><i style="background:#8fcbe6"></i><b>Ciel loupe</b><span>#8FCBE6</span></div>
+        </div>
+      </div>
+
+      <div>
+        <span class="tag" style="display:block; margin-bottom: 14px"><b>II</b>Typographie</span>
+        <div class="typeCard">
+          <i class="tape yellow"></i>
+          <div class="sample"><small>Mochiy Pop One<br />titres</small><span class="title">L'affaire du jour !</span></div>
+          <div class="sample"><small>Nunito<br />texte</small><span class="text">Le prochain épisode est déjà dans ton dossier.</span></div>
+          <div class="sample"><small>Patrick Hand<br />notes</small><span class="hand">Indice : regarde l'épisode 7 !</span></div>
+          <div class="sample"><small>Courier Prime<br />fiches</small><span class="file">AFFAIRE N° 154587 · ÉP. 07/28</span></div>
+        </div>
+      </div>
+
+      <div class="motifRow">
+        <div class="motif">
+          <span class="tag"><b>III</b>Carte</span>
+          <div class="card">
+            <div class="badge"><svg viewBox="0 0 48 46"><use href="#star5" /></svg><span>XVII</span></div>
+            <svg class="kira shine" viewBox="0 0 24 24"><use href="#kira" /></svg>
+            <div class="slot">jaquette<br />de l'anime</div>
+            <div class="name">L'Étoile</div>
+          </div>
+        </div>
+
+        <div class="motif">
+          <span class="tag"><b>IV</b>Carnet d'enquête</span>
+          <div class="page">
+            <i class="tape"></i>
+            <div class="line">Affaire : <b>Frieren</b></div>
+            <div class="line">Studio : Madhouse</div>
+            <div class="line">Vu jusqu'à l'<span class="circled">ép. 28</span></div>
+            <div class="line">Note : ★★★★★</div>
+            <span class="stampDone">RÉSOLU !</span>
+          </div>
+        </div>
+
+        <div class="motif">
+          <span class="tag"><b>V</b>Fil de laine &amp; bulles</span>
+          <div class="yarn">
+            <svg class="lines" viewBox="0 0 240 140"><path d="M34 18 C70 64 96 0 122 32 S184 10 206 24" fill="none" stroke="#d8433b" stroke-width="2.4" stroke-dasharray="0" stroke-linecap="round" /></svg>
+            <div class="polaroid" style="left: 4px; top: 14px; transform: rotate(-6deg)"><i class="pin"><svg viewBox="0 0 24 24"><use href="#heart" /></svg></i><div class="slot">avant</div><span>préquelle</span></div>
+            <div class="polaroid" style="left: 88px; top: 28px; transform: rotate(3deg)"><i class="pin"><svg viewBox="0 0 24 24"><use href="#heart" /></svg></i><div class="slot">ici !</div><span>cette affaire</span></div>
+            <div class="polaroid" style="left: 172px; top: 16px; transform: rotate(-2deg)"><i class="pin"><svg viewBox="0 0 24 24"><use href="#heart" /></svg></i><div class="slot">après</div><span>suite</span></div>
+          </div>
+          <div class="speed"><b>Épisode vu ! ★</b></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="preview">
+    <span class="tag"><b>VI</b>Aperçu de l'Accueil</span>
+    <div class="app">
+      <nav class="spine">
+        <span class="logo">Ruruka<svg class="kira" viewBox="0 0 24 24"><use href="#kira" /></svg></span>
+        <span class="navTab on">Accueil</span>
+        <span class="navTab">Mes listes</span>
+        <span class="navTab">Explorer</span>
+        <span class="navTab">Amis</span>
+        <span class="navTab">Bibliothèque</span>
+        <span class="navTab">Nouvelles <span class="count">3</span></span>
+        <span class="navTab">Réglages</span>
+      </nav>
+      <div class="main">
+        <div class="hello">Coucou, détective !<small>3 enquêtes t'attendent aujourd'hui</small></div>
+        <div class="hero">
+          <div class="slot">bannière AniList<br />avec trame manga</div>
+          <div class="over"><em>Sousou no Frieren</em><span class="play">▶ Épisode 7</span></div>
+        </div>
+        <div class="card">
+          <div class="badge"><svg viewBox="0 0 48 46"><use href="#star5" /></svg><span>VII</span></div>
+          <svg class="kira shine" viewBox="0 0 24 24"><use href="#kira" /></svg>
+          <div class="slot">carte du jour<br />(se retourne !)</div>
+          <div class="name">Épisode 7</div>
+        </div>
+        <div class="rows">
+          <div class="row"><svg class="check" viewBox="0 0 48 46" style="fill:#f4c542;stroke:#2b1e30;stroke-width:2"><use href="#star5" /></svg><div class="thumb slot">img</div><strong>Kusuriya no Hitorigoto</strong><span class="ep">ÉP. 18/24</span><span class="go">Lire</span></div>
+          <div class="row"><svg class="check" viewBox="0 0 48 46" style="fill:#fff;stroke:#2b1e30;stroke-width:2"><use href="#star5" /></svg><div class="thumb slot">img</div><strong>Dungeon Meshi</strong><span class="ep">ÉP. 09/24</span><span class="go">Lire</span></div>
+          <div class="row"><svg class="check" viewBox="0 0 48 46" style="fill:#fff;stroke:#2b1e30;stroke-width:2"><use href="#star5" /></svg><div class="thumb slot">img</div><strong>Bocchi the Rock!</strong><span class="ep">ÉP. 05/12</span><span class="go alt">Chercher</span></div>
+        </div>
+      </div>
+      <svg class="kira floatKira" viewBox="0 0 24 24" style="right: 190px; top: 70px"><use href="#kira" /></svg>
+      <svg class="kira floatKira" viewBox="0 0 24 24" style="right: 30px; top: 300px; width: 20px; height: 20px; fill: #f28ba8"><use href="#kira" /></svg>
+    </div>
+    <div class="bubble">Épisode 6 vu ! Le 7 est prêt, on continue ?<small>— Mashutan</small></div>
+  </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,106 @@
+import type { MediaSummary } from '../api/types';
+import { invoke, on } from '../lib/bridge';
+import { library } from './library.svelte';
+import { mediaList } from './mediaList.svelte';
+import { session } from './session.svelte';
+import { toasts } from './toasts.svelte';
+
+export interface SkipPrompt {
+  media: MediaSummary;
+  requested: number;
+  suggested: number;
+  hasSuggestedFile: boolean;
+}
+
+interface NowPlaying {
+  media: MediaSummary;
+  episode: number;
+  isWatched: boolean;
+}
+
+class Playback {
+  nowPlaying = $state<NowPlaying | null>(null);
+  skipPrompt = $state<SkipPrompt | null>(null);
+  private resolveSkipPrompt: ((episode: number | null) => void) | null = null;
+  private sessions = new Map<string, NowPlaying>();
+
+  init(): void {
+    on('player.watched', ({ mediaId, episode }) => this.handleWatched(mediaId, episode));
+    on('player.closed', ({ mediaId, episode }) => this.handleClosed(mediaId, episode));
+  }
+
+  hasEpisodeFile(mediaId: number, episode: number): boolean {
+    return library.episodesFor(mediaId).has(episode);
+  }
+
+  /** Plays an episode, first warning when it skips ahead of the list progress. */
+  async requestPlay(media: MediaSummary, episode: number): Promise<void> {
+    const entry = mediaList.entryFor(media.id);
+    const suggested = (entry?.progress ?? 0) + 1;
+    const isRewatch = entry?.status === 'COMPLETED';
+    const shouldWarn = session.settings?.hasSkipWarning && !isRewatch && episode > suggested;
+
+    const chosen = shouldWarn ? await this.askAboutSkip(media, episode, suggested) : episode;
+    if (chosen !== null) await this.play(media, chosen);
+  }
+
+  answerSkipPrompt(episode: number | null): void {
+    this.resolveSkipPrompt?.(episode);
+    this.resolveSkipPrompt = null;
+    this.skipPrompt = null;
+  }
+
+  private askAboutSkip(media: MediaSummary, requested: number, suggested: number): Promise<number | null> {
+    this.skipPrompt = { media, requested, suggested, hasSuggestedFile: this.hasEpisodeFile(media.id, suggested) };
+    return new Promise((resolve) => {
+      this.resolveSkipPrompt = resolve;
+    });
+  }
+
+  private async play(media: MediaSummary, episode: number): Promise<void> {
+    const file = library.episodesFor(media.id).get(episode);
+    if (!file) {
+      toasts.error(`L’épisode ${episode} n’est pas dans ton dossier.`);
+      return;
+    }
+    try {
+      await invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title: media.title.userPreferred });
+      const started = { media, episode, isWatched: false };
+      this.sessions.set(sessionKey(media.id, episode), started);
+      this.nowPlaying = started;
+    } catch (error) {
+      toasts.error(error, 'Impossible de lancer mpv');
+    }
+  }
+
+  private async handleWatched(mediaId: number, episode: number): Promise<void> {
+    const current = this.sessions.get(sessionKey(mediaId, episode));
+    if (!current) return;
+    current.isWatched = true;
+    try {
+      const result = await mediaList.recordWatched(current.media, episode);
+      if (result === 'updated') toasts.success(`Épisode ${episode} de ${current.media.title.userPreferred} vu !`);
+    } catch (error) {
+      toasts.error(error, 'Impossible de mettre à jour ta liste');
+    }
+  }
+
+  private handleClosed(mediaId: number, episode: number): void {
+    const key = sessionKey(mediaId, episode);
+    const finished = this.sessions.get(key);
+    this.sessions.delete(key);
+    if (this.nowPlaying?.media.id === mediaId && this.nowPlaying.episode === episode) this.nowPlaying = null;
+    if (!finished?.isWatched) return;
+
+    const next = episode + 1;
+    if (!this.hasEpisodeFile(mediaId, next)) return;
+    toasts.show(`On enchaîne avec l’épisode ${next} ?`, 'info', {
+      label: 'Regarder',
+      run: () => this.requestPlay(finished.media, next),
+    });
+  }
+}
+
+const sessionKey = (mediaId: number, episode: number) => `${mediaId}:${episode}`;
+
+export const playback = new Playback();

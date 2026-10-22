@@ -1,0 +1,9 @@
+bin/
+obj/
+/dist/
+*.user
+.vs/
+/.tools/
+# Drop folder for reference files; the art actually used is copied into web/public/art.
+/Exemple/
+/CLAUDE.md

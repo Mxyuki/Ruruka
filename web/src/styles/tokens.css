@@ -1,0 +1,99 @@
+/* <-- Le carnet magique de Ruruka : seule source des couleurs, typos, espacements et formes --> */
+
+:root {
+  /* <-- Palette --> */
+  --colorMilk: #fbf7ef;
+  --colorPaper: #ffffff;
+  --colorCollar: #eee7da;
+  --colorSunken: #f4eef6;
+  --colorMauve: #d9c6e2;
+  --colorMauveSoft: rgb(217 198 226 / 0.45);
+  --colorLilac: #a98bc4;
+  --colorPlum: #5e3f61;
+  --colorInk: #2b1e30;
+  --colorStar: #f4c542;
+  --colorBlond: #f6e3a8;
+  --colorStrawberry: #f28ba8;
+  --colorThread: #d8433b;
+  --colorSky: #8fcbe6;
+  --colorSkySoft: rgb(143 203 230 / 0.35);
+
+  /* <-- Rôles du texte (contrastes vérifiés sur le lait) --> */
+  --textMain: var(--colorInk);
+  --textSoft: var(--colorPlum);
+  --textFaint: #76667c;
+  --colorSuccess: #2f8a5b;
+  --colorWarning: #a8650f;
+  --colorDanger: #b8322b;
+
+  /* <-- Traits et ombres d'autocollant --> */
+  --colorLine: rgb(43 30 48 / 0.12);
+  --colorLineStrong: rgb(43 30 48 / 0.3);
+  --outline: 2px solid var(--colorInk);
+  --outlineThin: 1.5px solid var(--colorInk);
+  --stickerShadow: 3px 3px 0 var(--colorInk);
+  --stickerShadowLarge: 5px 5px 0 var(--colorInk);
+  --colorOverlay: rgb(43 30 48 / 0.45);
+
+  /* <-- Statuts de liste, en aplats pastel cernés d'encre --> */
+  --statusCurrent: var(--colorSky);
+  --statusPlanning: var(--colorLilac);
+  --statusCompleted: var(--colorStar);
+  --statusPaused: var(--colorBlond);
+  --statusDropped: var(--colorStrawberry);
+  --statusRepeating: var(--colorMauve);
+
+  /* <-- Texte posé sur une image, toujours sur un voile sombre --> */
+  --onImage: #ffffff;
+  --onImageMuted: rgb(255 255 255 / 0.82);
+  --scrim: rgb(43 30 48);
+
+  /* <-- Textures : quadrillage de carnet, trame manga, lignes de cahier --> */
+  --notebookDots: radial-gradient(rgb(169 139 196 / 0.32) 1.2px, transparent 1.4px) 0 0 / 22px 22px;
+  --screentone: radial-gradient(rgb(94 63 97 / 0.2) 1.3px, transparent 1.6px) 0 0 / 6px 6px;
+  --ruledLines: repeating-linear-gradient(transparent 0 27px, rgb(143 203 230 / 0.55) 27px 28px);
+  --coverFallback: var(--screentone), var(--colorMauve);
+
+  /* <-- Pastels des boules de glace (interrupteurs) --> */
+  --scoopStrawberry: #ffb3cf;
+  --scoopLavender: #d7b8ff;
+  --scoopMint: #a8ecd0;
+  --scoopVanilla: #fff1c1;
+
+  /* <-- Typographie --> */
+  --fontTitle: 'Mochiy Pop One', 'Nunito', sans-serif;
+  --fontText: 'Nunito', 'Segoe UI', sans-serif;
+  --fontHand: 'Patrick Hand', 'Nunito', cursive;
+  --fontFile: 'Courier Prime', 'Consolas', monospace;
+  --fontSizeXs: 1.2rem;
+  --fontSizeSm: 1.35rem;
+  --fontSizeMd: 1.5rem;
+  --fontSizeLg: 1.9rem;
+  --fontSizeXl: 2.5rem;
+  --fontSize2xl: 3.6rem;
+
+  /* <-- Espacements --> */
+  --space1: 4px;
+  --space2: 8px;
+  --space3: 12px;
+  --space4: 16px;
+  --space5: 24px;
+  --space6: 32px;
+  --space7: 48px;
+
+  /* <-- Formes : chaque rayon a un rôle, pas un arrondi uniforme partout --> */
+  --radiusSmall: 8px;
+  --radiusSticker: 14px;
+  --radiusLarge: 20px;
+  --radiusPage: 6px 16px 16px 6px;
+  --radiusPill: 999px;
+
+  /* <-- Mise en page et mouvement --> */
+  --sidebarWidth: 232px;
+  --titleBarHeight: 38px;
+  --contentMaxWidth: 1720px;
+  --transitionFast: 0.16s ease;
+  --easeSpring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  color-scheme: light;
+}
