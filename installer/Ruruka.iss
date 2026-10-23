@@ -68,4 +68,5 @@ Name: "{group}\Ruruka"; Filename: "{app}\Ruruka.exe"
 Name: "{autodesktop}\Ruruka"; Filename: "{app}\Ruruka.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Ruruka.exe"; Description: "{cm:LaunchProgram,Ruruka}"; Flags: nowait postinstall skipifsilent
+; <-- Sans skipifsilent : après une mise à jour silencieuse lancée par l'app, Ruruka se relance tout seul -->
+Filename: "{app}\Ruruka.exe"; Description: "{cm:LaunchProgram,Ruruka}"; Flags: nowait postinstall 

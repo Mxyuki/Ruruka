@@ -69,6 +69,7 @@ src/Ruruka.Desktop/          C# host
   Library/                   folder scanning, filename parsing, folder ↔ media links
   Player/                    mpv discovery (MpvLocator), process + IPC (MpvSession), watched-time maths (WatchTracker)
   Windowing/                 Windows 11 title-bar theming (DWM)
+  Updates/                   GitHub release check + installer download (UpdateService)
 
 tests/Ruruka.Desktop.Tests/  xUnit: filename parsing, watch tracking
 Directory.Build.targets      drops the WPF assembly the WebView2 package always references
@@ -79,7 +80,7 @@ web/src/
   lib/                       helpers with no app state: bridge, router, routes, format, html, nyaa, titleMatch
   api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts
     queries/                 GraphQL documents + typed fetchers, one file per domain
-  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, toasts
+  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, updates, toasts
   components/                UI used by 2+ features (MediaCard, Modal, ScoreBadge…)
   pages/<feature>/           a route's page and its private sections
 ```
@@ -113,6 +114,8 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `shell.openUrl` | Open an http(s) link in the default browser |
 | `shell.openPath` | Open a folder in Explorer or a video in its default app (nothing else, by design) |
 | `shell.pickFolder` / `shell.pickFile` | Native dialogs |
+| `update.check` | Latest GitHub release if newer than this build and it ships a `Ruruka-Setup-*.exe`, else null |
+| `update.install` | Download that installer, quit, then run it silently once the instance mutex is released |
 
 | Event | Payload |
 |---|---|

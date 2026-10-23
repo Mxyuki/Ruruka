@@ -8,6 +8,7 @@
   import SkipWarningDialog from './components/SkipWarningDialog.svelte';
   import TitleBar from './components/TitleBar.svelte';
   import Toasts from './components/Toasts.svelte';
+  import UpdateDialog from './components/UpdateDialog.svelte';
   import { router } from './lib/router.svelte';
   import { routes } from './lib/routes';
   import { installSparkles } from './lib/sparkle';
@@ -17,6 +18,7 @@
   import { playback } from './state/playback.svelte';
   import { session } from './state/session.svelte';
   import { toasts } from './state/toasts.svelte';
+  import { updates } from './state/updates.svelte';
 
   const match = $derived(router.match(routes));
 
@@ -26,6 +28,7 @@
   onMount(() => {
     playback.init();
     void session.init();
+    void updates.check();
     return installSparkles();
   });
 
@@ -77,6 +80,7 @@
   </div>
 </div>
 
+<UpdateDialog />
 <Toasts />
 
 <style>

@@ -46,6 +46,12 @@ export interface PlaybackTarget {
   title: string;
 }
 
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notesUrl: string;
+}
+
 /** Every host method: `[params, result]`. Registered in src/Ruruka.Desktop/Bridge/Modules. */
 interface BridgeApi {
   'settings.get': [void, Settings];
@@ -70,6 +76,8 @@ interface BridgeApi {
   'window.close': [void, boolean];
   'window.startDrag': [void, boolean];
   'window.startResize': [void, boolean];
+  'update.check': [void, UpdateInfo | null];
+  'update.install': [void, boolean];
 }
 
 export interface BridgeEvents {

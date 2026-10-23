@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Settings;
 
@@ -33,5 +34,10 @@ internal static class Program
 
         Application.Run(window);
         showRequests.Unregister(null);
+
+        // <-- L'installateur refuse de tourner tant que le mutex d'instance existe : on le libère avant de le lancer -->
+        if (window.PendingInstaller is not { } installer) return;
+        instanceMutex.Dispose();
+        Process.Start(new ProcessStartInfo(installer, "/SILENT /SP- /NOCANCEL") { UseShellExecute = true });
     }
 }

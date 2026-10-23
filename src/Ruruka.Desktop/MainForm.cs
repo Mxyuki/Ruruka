@@ -5,6 +5,7 @@ using Ruruka.Desktop.Bridge.Modules;
 using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Player;
 using Ruruka.Desktop.Settings;
+using Ruruka.Desktop.Updates;
 using Ruruka.Desktop.Windowing;
 
 namespace Ruruka.Desktop;
@@ -24,6 +25,9 @@ internal sealed class MainForm : Form
     private readonly TrayIcon _tray;
     private CoreWebView2Environment? _environment;
     private bool _isExiting;
+
+    /// <summary>An installer downloaded by <c>update.install</c>, launched once the app has fully quit.</summary>
+    public string? PendingInstaller { get; private set; }
 
     public MainForm(SettingsStore settings, LinkStore links)
     {
@@ -95,6 +99,13 @@ internal sealed class MainForm : Form
     {
         _isExiting = true;
         Close();
+    }
+
+    // <-- La réponse du pont part avant que la fenêtre se ferme -->
+    private void QuitForUpdate(string installerPath)
+    {
+        PendingInstaller = installerPath;
+        BeginInvoke(Exit);
     }
 
     protected override async void OnLoad(EventArgs e)
@@ -182,6 +193,7 @@ internal sealed class MainForm : Form
             new PlayerModule(new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray))),
             new ShellModule(this),
             new WindowModule(this),
+            new UpdateModule(new UpdateService(), QuitForUpdate),
         ];
         foreach (var module in modules) module.Register(router);
         return router;

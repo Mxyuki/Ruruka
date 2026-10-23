@@ -24,14 +24,24 @@ export function sanitizeHtml(html: string | null | undefined): string {
  */
 function expandAniListMarkdown(html: string): string {
   return html
+    .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gi, restoreCenterFence)
     .replace(/<center>([\s\S]*?)<\/center>/gi, (_, inner: string) => `<center>${renderLooseMarkdown(inner)}</center>`)
     .replace(/\[((?:[^[\]]|<img[^>]*>)*)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
 }
 
+// <-- `~~~` centre le texte sur AniList, mais asHtml le lit comme un bloc de code et échappe tout son contenu -->
+function restoreCenterFence(codeBlock: string, escapedInner: string): string {
+  const inner = new DOMParser().parseFromString(escapedInner, 'text/html').body.textContent ?? '';
+  if (!/<(img|video|div|center|a)\b/i.test(inner)) return codeBlock;
+  return `<div align="center">${renderLooseMarkdown(inner.replace(/~~~/g, ''))}</div>`;
+}
+
 function renderLooseMarkdown(text: string): string {
   return text
+    .replace(/~!([\s\S]*?)!~/g, '<span class="markdown_spoiler">$1</span>')
     .replace(/^#{1,5}\s+(.+)$/gm, '<h3>$1</h3>')
     .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, '<em>$1</em>')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\n/g, '<br>');
 }
@@ -48,6 +58,10 @@ function cleanChildren(parent: Node): void {
       node.replaceWith(youtubeLink(node.id));
       continue;
     }
+    if (node.tagName === 'VIDEO') {
+      node.replaceWith(videoLink(node));
+      continue;
+    }
     cleanChildren(node);
     if (allowedTags.has(node.tagName)) cleanAttributes(node);
     else node.replaceWith(...node.childNodes);
@@ -56,12 +70,23 @@ function cleanChildren(parent: Node): void {
 
 // <-- Les lecteurs intégrés sont lourds : un lien vers le navigateur garde les profils légers -->
 function youtubeLink(idOrUrl: string): HTMLAnchorElement {
+  const url = webUrl.test(idOrUrl) ? idOrUrl : `https://www.youtube.com/watch?v=${encodeURIComponent(idOrUrl)}`;
+  return embedLink(url, '▶ Vidéo YouTube');
+}
+
+function videoLink(video: Element): Node {
+  const src = video.getAttribute('src') ?? video.querySelector('source')?.getAttribute('src') ?? '';
+  if (!webUrl.test(src)) return document.createTextNode('');
+  return embedLink(src, '▶ Vidéo');
+}
+
+function embedLink(url: string, label: string): HTMLAnchorElement {
   const link = document.createElement('a');
-  link.href = webUrl.test(idOrUrl) ? idOrUrl : `https://www.youtube.com/watch?v=${encodeURIComponent(idOrUrl)}`;
+  link.href = url;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   link.className = 'embed-link';
-  link.textContent = '▶ Vidéo YouTube';
+  link.textContent = label;
   return link;
 }
 
