@@ -18,6 +18,9 @@
     [1.5, '150%'],
   ];
 
+  const completionOptions = [70, 75, 80, 85, 90, 95];
+  const minimumWatchedOptions = [30, 40, 50, 60, 70];
+
   async function update(patch: Parameters<typeof session.updateSettings>[0]) {
     try {
       await session.updateSettings(patch);
@@ -65,6 +68,37 @@
           label="La croix range Ruruka dans la zone de notification (le suivi des épisodes continue)"
           onchange={(isCloseToTray) => update({ isCloseToTray })}
         />
+      </div>
+
+      <!-- Quand un épisode compte comme vu -->
+      <h3 class="option-title">Épisode vu à</h3>
+      <p class="hint">L’épisode est coché sur AniList une fois la lecture arrivée à ce point.</p>
+      <div class="themes">
+        {#each completionOptions as percent (percent)}
+          <button
+            class="chip"
+            class:is-active={session.settings?.episodeCompletionPercent === percent}
+            type="button"
+            onclick={() => update({ episodeCompletionPercent: percent })}
+          >
+            {percent} %
+          </button>
+        {/each}
+      </div>
+
+      <h3 class="option-title">Temps vu minimum</h3>
+      <p class="hint">Tu peux passer les génériques et les passages lents tant que tu as vraiment regardé cette part de l’épisode. Revoir une scène ne compte qu’une fois.</p>
+      <div class="themes">
+        {#each minimumWatchedOptions as percent (percent)}
+          <button
+            class="chip"
+            class:is-active={session.settings?.minimumWatchedPercent === percent}
+            type="button"
+            onclick={() => update({ minimumWatchedPercent: percent })}
+          >
+            {percent} %
+          </button>
+        {/each}
       </div>
     </section>
 
@@ -134,5 +168,11 @@
 
   .option {
     margin-top: var(--space4);
+  }
+
+  .option-title {
+    margin: var(--space5) 0 var(--space3);
+    font-size: var(--fontSizeSm);
+    font-weight: 800;
   }
 </style>

@@ -36,21 +36,30 @@ class LibraryStore {
   mediaById = new SvelteMap<number, MediaSummary>();
 
   hasRoot = $derived(Boolean(session.settings?.libraryRoot));
+  private pendingScan: Promise<void> | null = null;
 
+  /** Rescans, links new folders and loads their media; does nothing while another refresh runs. */
   async refresh(): Promise<void> {
     if (!this.hasRoot || this.status !== 'idle') return;
     this.status = 'scanning';
     try {
-      const [folders, links] = await Promise.all([invoke('library.scan'), invoke('library.getLinks')]);
-      this.folders = folders;
-      this.links = links;
+      await this.rescan();
       await this.loadLinkedMedia();
-      await this.autoMatch(folders.filter((folder) => !this.links[folder.name]));
+      await this.autoMatch(this.folders.filter((folder) => !this.links[folder.name]));
     } catch (error) {
       toasts.error(error, 'Impossible de lire tes dossiers');
     } finally {
       this.status = 'idle';
     }
+  }
+
+  /** Re-reads folders and links from disk only, joining a scan already in flight. Rejects on host errors. */
+  rescan(): Promise<void> {
+    if (!this.hasRoot) return Promise.resolve();
+    this.pendingScan ??= this.scan().finally(() => {
+      this.pendingScan = null;
+    });
+    return this.pendingScan;
   }
 
   linkFor(folderName: string): FolderLink | undefined {
@@ -100,6 +109,12 @@ class LibraryStore {
     } finally {
       this.status = 'idle';
     }
+  }
+
+  private async scan(): Promise<void> {
+    const [folders, links] = await Promise.all([invoke('library.scan'), invoke('library.getLinks')]);
+    this.folders = folders;
+    this.links = links;
   }
 
   private async autoMatch(folders: LibraryFolder[]): Promise<void> {

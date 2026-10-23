@@ -22,6 +22,12 @@ public sealed record AppSettings
     /// <summary>The close button hides the window to the notification area so playback tracking keeps running.</summary>
     public bool IsCloseToTray { get; init; } = true;
 
+    /// <summary>How far into an episode (in %) playback must reach before it counts as watched.</summary>
+    public int EpisodeCompletionPercent { get; init; } = 85;
+
+    /// <summary>The share of an episode (in %) that must really be played, so skipped parts stay allowed up to the rest.</summary>
+    public int MinimumWatchedPercent { get; init; } = 50;
+
     public PublicSettings ToPublic() => new(
         AniListClientId,
         ProtectedToken is not null,
@@ -30,7 +36,9 @@ public sealed record AppSettings
         IsSetupComplete,
         HasSkipWarning,
         InterfaceScale,
-        IsCloseToTray);
+        IsCloseToTray,
+        EpisodeCompletionPercent,
+        MinimumWatchedPercent);
 }
 
 /// <summary>The settings the UI may see: the token is reduced to whether one exists.</summary>
@@ -42,7 +50,9 @@ public sealed record PublicSettings(
     bool IsSetupComplete,
     bool HasSkipWarning,
     double InterfaceScale,
-    bool IsCloseToTray);
+    bool IsCloseToTray,
+    int EpisodeCompletionPercent,
+    int MinimumWatchedPercent);
 
 /// <summary>A partial update from the UI; null fields are left unchanged.</summary>
 public sealed record SettingsPatch
@@ -54,4 +64,6 @@ public sealed record SettingsPatch
     public bool? HasSkipWarning { get; init; }
     public double? InterfaceScale { get; init; }
     public bool? IsCloseToTray { get; init; }
+    public int? EpisodeCompletionPercent { get; init; }
+    public int? MinimumWatchedPercent { get; init; }
 }

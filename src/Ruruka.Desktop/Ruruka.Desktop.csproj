@@ -11,7 +11,7 @@
     <RootNamespace>Ruruka.Desktop</RootNamespace>
     <ApplicationIcon>..\..\assets\ruruka.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
 
     <!-- Keep the host's footprint small: a single-threaded UI app needs neither server nor background GC. -->
     <ServerGarbageCollection>false</ServerGarbageCollection>

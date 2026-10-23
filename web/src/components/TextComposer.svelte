@@ -44,10 +44,16 @@
 </div>
 
 <style>
+  /* <-- Dans une colonne étroite, le bouton passe à la ligne plutôt que d'écraser la zone de texte --> */
   .composer {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
     gap: var(--space2);
+  }
+
+  button {
+    margin-left: auto;
   }
 
   img {
@@ -57,6 +63,8 @@
   }
 
   textarea {
+    flex: 1 1 120px;
+    min-width: 0;
     min-height: 38px;
     max-height: 160px;
     resize: none;

@@ -120,7 +120,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | Event | Payload |
 |---|---|
 | `player.started` | `{ mediaId, episode }` |
-| `player.watched` | `{ mediaId, episode }`. Fired once when 80% of the episode was actually played |
+| `player.watched` | `{ mediaId, episode }`. Fired once the episode counts as watched (see Watch tracking) |
 | `player.closed` | `{ mediaId, episode, watchedRatio }` |
 
 The UI never navigates away from the app page. `MainForm` sends every outbound navigation
@@ -130,10 +130,17 @@ and every `target="_blank"` link to the default browser.
 
 **Watch tracking.** `player.play` starts mpv with `--input-ipc-server=\\.\pipe\ruruka-mpv-<id>`.
 `MpvSession` observes `time-pos` and `duration` and feeds them to `WatchTracker`. The tracker
-adds only small forward steps (≤ 3 s) to the watched time, so skipping ahead doesn't count. Once
-watched time reaches 80% of the duration, the session emits `player.watched`. `state/playback.svelte.ts` then updates the AniList entry only if
+keeps the played stretches of the episode, built from small forward steps (≤ 3 s) and merged, so
+skipping ahead doesn't count and rewatching a scene counts once. Once playback reaches the
+completion point (Settings, 85% by default) *and* the played stretches cover the minimum watched
+share (50% by default), the session emits `player.watched`. Both values are percentages in
+`AppSettings`, validated in `SettingsModule`. `state/playback.svelte.ts` then updates the AniList entry only if
 `episode > progress`, using the same status rules as AniList: the first episode sets
 Watching, the last episode sets Completed.
+
+**New downloads.** Opening a media page runs `library.refresh()`, so episodes downloaded since
+the last scan show up. Clicking an episode that isn't on disk first runs `library.rescan()`
+(disk only, no matching) and plays the file if it has appeared; otherwise it opens Nyaa.
 
 **Skip warning.** Before playing, `playback.requestPlay` compares the episode to the list
 progress. If it's more than one ahead, it shows a dialog suggesting `progress + 1`. The user

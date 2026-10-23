@@ -16,7 +16,7 @@ Ruruka est une petite application Windows pour suivre tes anime et tes manga sur
 à résoudre.
 
 Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
-[mpv](https://mpv.io) et **coche l'épisode toute seule** quand tu en as vu 80 %.
+[mpv](https://mpv.io) et **coche l'épisode toute seule** quand tu arrives à 85 % (réglable).
 
 <table>
   <tr>
@@ -35,7 +35,7 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
   les sorties à venir et ce que regardent tes amis.
 - **Ton dossier d'anime relié à AniList.** Chaque sous-dossier est reconnu tout seul (même les
   collections rangées par saison). Si Ruruka se trompe, tu corriges le lien en deux clics.
-- **Lecture dans mpv et progression automatique.** À 80 % de l'épisode, ta liste se met à jour.
+- **Lecture dans mpv et progression automatique.** Arrivé à 85 % de l'épisode, ta liste se met à jour. Tu peux passer les génériques tant que tu as vraiment vu la moitié de l'épisode ; les deux seuils se règlent.
   Elle ne recule jamais : si tu revois un vieil épisode, ta progression ne bouge pas.
 - **Un petit avertissement** si tu lances l'épisode 20 alors que tu en es au 16. Ruruka te
   propose le 17, mais tu restes libre.

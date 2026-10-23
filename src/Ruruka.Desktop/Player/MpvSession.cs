@@ -19,12 +19,13 @@ internal sealed class MpvSession
     private readonly PlaybackTarget _target;
     private readonly IBridgeEvents _events;
     private readonly Process _process;
-    private readonly WatchTracker _tracker = new();
+    private readonly WatchTracker _tracker;
     private readonly string _pipeName = $"ruruka-mpv-{Guid.NewGuid():N}";
 
-    private MpvSession(string mpvPath, PlaybackTarget target, IBridgeEvents events)
+    private MpvSession(string mpvPath, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events)
     {
         _target = target;
+        _tracker = tracker;
         _events = events;
         var startInfo = new ProcessStartInfo(mpvPath) { UseShellExecute = false };
         startInfo.ArgumentList.Add(IpcServerArgument(_pipeName));
@@ -42,9 +43,9 @@ internal sealed class MpvSession
     internal static string IpcServerArgument(string pipeName) => $@"--input-ipc-server=\\.\pipe\{pipeName}";
 
     /// <summary>Starts mpv and tracks it in the background until it exits.</summary>
-    public static void Start(string mpvPath, PlaybackTarget target, IBridgeEvents events)
+    public static void Start(string mpvPath, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events)
     {
-        var session = new MpvSession(mpvPath, target, events);
+        var session = new MpvSession(mpvPath, target, tracker, events);
         session._process.Start();
         events.Emit("player.started", new { target.MediaId, target.Episode });
         _ = session.TrackAsync();

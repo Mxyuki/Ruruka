@@ -29,6 +29,8 @@ public sealed class SettingsStore
         HasSkipWarning = patch.HasSkipWarning ?? settings.HasSkipWarning,
         InterfaceScale = patch.InterfaceScale ?? settings.InterfaceScale,
         IsCloseToTray = patch.IsCloseToTray ?? settings.IsCloseToTray,
+        EpisodeCompletionPercent = patch.EpisodeCompletionPercent ?? settings.EpisodeCompletionPercent,
+        MinimumWatchedPercent = patch.MinimumWatchedPercent ?? settings.MinimumWatchedPercent,
     });
 
     public string? ReadToken()

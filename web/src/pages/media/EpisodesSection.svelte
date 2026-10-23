@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { MediaDetails } from '../../api/queries/media';
   import Icon from '../../components/Icon.svelte';
   import Section from '../../components/Section.svelte';
@@ -34,6 +35,31 @@
   });
 
   const nyaaTitle = $derived(media.title.romaji ?? media.title.userPreferred);
+
+  // <-- Un épisode a pu être téléchargé depuis le dernier passage : on relit les dossiers à chaque ouverture -->
+  $effect(() => {
+    void media.id;
+    untrack(() => void library.refresh());
+  });
+
+  // <-- Avant de partir sur Nyaa, on vérifie que l'épisode n'est pas arrivé entre-temps -->
+  async function findEpisode(event: MouseEvent, episode: number) {
+    event.preventDefault();
+    try {
+      await library.rescan();
+    } catch (error) {
+      toasts.error(error, 'Impossible de relire tes dossiers');
+    }
+    if (library.episodesFor(media.id).has(episode)) {
+      await playback.requestPlay(media, episode);
+      return;
+    }
+    try {
+      await invoke('shell.openUrl', { url: nyaaEpisodeSearchUrl(nyaaTitle, episode) });
+    } catch (error) {
+      toasts.error(error, 'Impossible d’ouvrir Nyaa');
+    }
+  }
 
   async function openFolder(path: string) {
     try {
@@ -85,6 +111,7 @@
             href={nyaaEpisodeSearchUrl(nyaaTitle, episode)}
             target="_blank"
             rel="noopener noreferrer"
+            onclick={(event) => findEpisode(event, episode)}
             title="L'épisode {episode} n'est pas téléchargé : le chercher sur Nyaa"
           >
             <span class="number">{episode}</span>

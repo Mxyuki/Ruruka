@@ -9,6 +9,10 @@ export interface Settings {
   interfaceScale: number;
   /** The close button hides the window to the notification area instead of quitting. */
   isCloseToTray: boolean;
+  /** How far into an episode (in %) playback must reach before it counts as watched. */
+  episodeCompletionPercent: number;
+  /** The share of an episode (in %) that must really be played; the rest may be skipped. */
+  minimumWatchedPercent: number;
 }
 
 export type SettingsPatch = Partial<Omit<Settings, 'isLoggedIn'>>;

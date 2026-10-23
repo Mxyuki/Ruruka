@@ -5,11 +5,22 @@ namespace Ruruka.Desktop.Tests;
 public sealed class WatchTrackerTests
 {
     private const double EpisodeSeconds = 1440;
+    private const double CompletionRatio = 0.85;
+    private const double MinimumWatchedRatio = 0.5;
+
+    private static WatchTracker NewTracker() => new(CompletionRatio, MinimumWatchedRatio) { DurationSeconds = EpisodeSeconds };
+
+    private static bool Play(WatchTracker tracker, double from, double to)
+    {
+        var crossed = false;
+        for (var position = from; position <= to; position += 0.5) crossed |= tracker.RecordPosition(position);
+        return crossed;
+    }
 
     [Fact]
-    public void ContinuousPlayback_CrossesThresholdOnceAtEightyPercent()
+    public void ContinuousPlayback_CrossesOnceAtCompletionRatio()
     {
-        var tracker = new WatchTracker { DurationSeconds = EpisodeSeconds };
+        var tracker = NewTracker();
         var crossings = new List<double>();
 
         for (var position = 0.0; position <= EpisodeSeconds; position += 0.5)
@@ -18,41 +29,63 @@ public sealed class WatchTrackerTests
         }
 
         var crossing = Assert.Single(crossings);
-        Assert.InRange(crossing, EpisodeSeconds * 0.8, EpisodeSeconds * 0.8 + 1);
+        Assert.InRange(crossing, EpisodeSeconds * CompletionRatio, EpisodeSeconds * CompletionRatio + 1);
     }
 
     [Fact]
     public void SeekingToTheEnd_DoesNotCountAsWatched()
     {
-        var tracker = new WatchTracker { DurationSeconds = EpisodeSeconds };
-        for (var position = 0.0; position <= 60; position += 0.5) tracker.RecordPosition(position);
+        var tracker = NewTracker();
+        Play(tracker, 0, 60);
 
-        var crossed = false;
-        for (var position = 1300.0; position <= EpisodeSeconds; position += 0.5) crossed |= tracker.RecordPosition(position);
-
-        Assert.False(crossed);
+        Assert.False(Play(tracker, 1300, EpisodeSeconds));
         Assert.InRange(tracker.WatchedRatio, 0.1, 0.2);
     }
 
     [Fact]
-    public void RewindingAndRewatching_StillReachesThreshold()
+    public void SkippingTheOpening_StillCountsAsWatched()
     {
-        var tracker = new WatchTracker { DurationSeconds = EpisodeSeconds };
-        for (var position = 0.0; position <= 600; position += 0.5) tracker.RecordPosition(position);
+        var tracker = NewTracker();
+        Play(tracker, 0, 60);
 
-        var crossed = false;
-        for (var position = 300.0; position <= 1200; position += 0.5) crossed |= tracker.RecordPosition(position);
+        Assert.True(Play(tracker, 150, 1300));
+    }
 
-        Assert.True(crossed);
+    [Fact]
+    public void RewatchingAScene_CountsItOnlyOnce()
+    {
+        var tracker = NewTracker();
+        Play(tracker, 0, 600);
+        Play(tracker, 300, 600);
+
+        Assert.InRange(tracker.WatchedRatio, 600 / EpisodeSeconds - 0.01, 600 / EpisodeSeconds + 0.01);
+    }
+
+    [Fact]
+    public void RewindingThenFinishing_CountsAsWatched()
+    {
+        var tracker = NewTracker();
+        Play(tracker, 0, 600);
+
+        Assert.True(Play(tracker, 300, EpisodeSeconds));
+    }
+
+    [Fact]
+    public void WatchingSkippedPartsAfterTheEnd_CountsOnceCompletionIsReachedAgain()
+    {
+        var tracker = NewTracker();
+        Play(tracker, 0, 60);
+        Play(tracker, 1240, 1300);
+
+        Assert.False(Play(tracker, 60, 1000));
+        Assert.True(Play(tracker, 1000, 1240));
     }
 
     [Fact]
     public void UnknownDuration_NeverCrosses()
     {
-        var tracker = new WatchTracker();
-        var crossed = false;
-        for (var position = 0.0; position <= EpisodeSeconds; position += 0.5) crossed |= tracker.RecordPosition(position);
+        var tracker = new WatchTracker(CompletionRatio, MinimumWatchedRatio);
 
-        Assert.False(crossed);
+        Assert.False(Play(tracker, 0, EpisodeSeconds));
     }
 }

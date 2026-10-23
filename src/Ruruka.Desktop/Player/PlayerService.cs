@@ -26,6 +26,8 @@ public sealed class PlayerService(SettingsStore settings, IBridgeEvents events)
         if (!File.Exists(target.FilePath)) throw new BridgeException($"Fichier de l'épisode introuvable : {target.FilePath}");
         var mpv = MpvLocator.Find(settings.Current.PlayerPath)
             ?? throw new BridgeException("mpv n'est pas installé. Installe-le pour lancer les épisodes depuis Ruruka.");
-        MpvSession.Start(mpv, target, events);
+        var current = settings.Current;
+        var tracker = new WatchTracker(current.EpisodeCompletionPercent / 100.0, current.MinimumWatchedPercent / 100.0);
+        MpvSession.Start(mpv, target, tracker, events);
     }
 }
