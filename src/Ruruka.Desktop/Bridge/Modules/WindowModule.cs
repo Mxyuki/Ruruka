@@ -2,8 +2,9 @@ using Ruruka.Desktop.Windowing;
 
 namespace Ruruka.Desktop.Bridge.Modules;
 
-/// <summary>The buttons and drag area of the title bar drawn by the UI.</summary>
-internal sealed class WindowModule(Form window) : IBridgeModule
+/// <summary>The buttons and drag area of the title bar drawn by the UI, and the quit handshake.</summary>
+/// <param name="onReadyToQuit">Called once the UI has finished its work after "window.closing".</param>
+internal sealed class WindowModule(Form window, Action onReadyToQuit) : IBridgeModule
 {
     public void Register(BridgeRouter router)
     {
@@ -12,6 +13,11 @@ internal sealed class WindowModule(Form window) : IBridgeModule
         router.Register("window.close", () => Run(window.Close));
         router.Register("window.startDrag", () => Run(() => WindowChrome.StartDrag(window.Handle)));
         router.Register("window.startResize", () => Run(StartResizeTop));
+        router.Register("window.readyToQuit", () =>
+        {
+            onReadyToQuit();
+            return Task.FromResult(true);
+        });
     }
 
     private void ToggleMaximize() =>

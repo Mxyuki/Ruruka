@@ -25,6 +25,13 @@ internal sealed class MainForm : Form
     private readonly TrayIcon _tray;
     private CoreWebView2Environment? _environment;
     private bool _isExiting;
+    private BridgeHost? _bridge;
+    private bool _isUiFinished;
+    private bool _isWaitingForUi;
+    private readonly TaskCompletionSource _uiFinishedSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // The UI gets a short moment to publish the idle profile; quitting never waits longer than this.
+    private static readonly TimeSpan UiFinishTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>An installer downloaded by <c>update.install</c>, launched once the app has fully quit.</summary>
     public string? PendingInstaller { get; private set; }
@@ -80,7 +87,26 @@ internal sealed class MainForm : Form
             _tray.ExplainHiding();
             return;
         }
+        if (!_isUiFinished && _bridge is not null && e.CloseReason != CloseReason.WindowsShutDown)
+        {
+            e.Cancel = true;
+            _ = CloseAfterUiAsync();
+            return;
+        }
         base.OnFormClosing(e);
+    }
+
+    // <-- Avant de quitter, l'interface remet le profil « au repos » pour qu'il ne reste pas bloqué sur un épisode -->
+    private async Task CloseAfterUiAsync()
+    {
+        if (_isWaitingForUi) return;
+        _isWaitingForUi = true;
+        Hide();
+        _bridge!.Emit("window.closing", new { });
+        await Task.WhenAny(_uiFinishedSignal.Task, Task.Delay(UiFinishTimeout));
+        _isUiFinished = true;
+        _isExiting = true;
+        Close();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -172,6 +198,7 @@ internal sealed class MainForm : Form
 
         var bridge = new BridgeHost(SynchronizationContext.Current!);
         bridge.Attach(core, CreateRouter(bridge));
+        _bridge = bridge;
 
         if (isDev)
         {
@@ -192,7 +219,7 @@ internal sealed class MainForm : Form
             new LibraryModule(_settings, _links),
             new PlayerModule(new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray))),
             new ShellModule(this),
-            new WindowModule(this),
+            new WindowModule(this, () => _uiFinishedSignal.TrySetResult()),
             new UpdateModule(new UpdateService(), QuitForUpdate),
         ];
         foreach (var module in modules) module.Register(router);

@@ -42,6 +42,13 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
 - **Boutons Nyaa** partout : sur chaque anime, chaque épisode manquant, chaque notification de
   sortie.
 - **Social** : l'activité de tes amis, les « j'aime », les réponses, et qui te suit en retour.
+- **Ta présentation, comme sur AniList.** Spoilers à cliquer, vidéos YouTube intégrées, blocs
+  centrés : les profils s'affichent comme sur le site. Le bouton « Modifier » ouvre un éditeur
+  avec aperçu en direct et un guide de toutes les balises.
+- **Profil en direct.** Entoure un texte de `[watching]…[/watching]` et utilise `${anime}`,
+  `${episode}`, `${time}`, `${duration}`… : pendant que tu regardes un épisode, ta présentation
+  AniList se met à jour toute seule (toutes les 15 secondes), puis repasse au repos quand tu
+  fermes mpv ou Ruruka.
 - **Listes perso** : ajoute un anime à tes listes personnalisées depuis sa fiche, ou crées-en
   une nouvelle.
 - **Discrète** : la croix range Ruruka près de l'horloge, et le suivi de l'épisode continue

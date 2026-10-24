@@ -28,6 +28,9 @@ public sealed record AppSettings
     /// <summary>The share of an episode (in %) that must really be played, so skipped parts stay allowed up to the rest.</summary>
     public int MinimumWatchedPercent { get; init; } = 50;
 
+    /// <summary>The profile "about" with live tags, kept on this PC only; empty when the about is plain text.</summary>
+    public string AboutTemplate { get; init; } = "";
+
     public PublicSettings ToPublic() => new(
         AniListClientId,
         ProtectedToken is not null,
@@ -38,7 +41,8 @@ public sealed record AppSettings
         InterfaceScale,
         IsCloseToTray,
         EpisodeCompletionPercent,
-        MinimumWatchedPercent);
+        MinimumWatchedPercent,
+        AboutTemplate);
 }
 
 /// <summary>The settings the UI may see: the token is reduced to whether one exists.</summary>
@@ -52,7 +56,8 @@ public sealed record PublicSettings(
     double InterfaceScale,
     bool IsCloseToTray,
     int EpisodeCompletionPercent,
-    int MinimumWatchedPercent);
+    int MinimumWatchedPercent,
+    string AboutTemplate);
 
 /// <summary>A partial update from the UI; null fields are left unchanged.</summary>
 public sealed record SettingsPatch
@@ -66,4 +71,7 @@ public sealed record SettingsPatch
     public bool? IsCloseToTray { get; init; }
     public int? EpisodeCompletionPercent { get; init; }
     public int? MinimumWatchedPercent { get; init; }
+
+    /// <summary>An empty string clears the template.</summary>
+    public string? AboutTemplate { get; init; }
 }

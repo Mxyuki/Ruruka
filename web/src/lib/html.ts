@@ -6,9 +6,11 @@ const allowedTags = new Set([
 ]);
 const droppedTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'NOSCRIPT', 'FORM', 'INPUT']);
 const webUrl = /^https?:\/\//;
+const youtubeIdPattern = /^[\w-]{11}$/;
+const youtubeUrlPattern = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/;
 
 /**
- * Keeps AniList's markup (formatting, links, images, spoilers, centered blocks) and drops
+ * Keeps AniList's markup (formatting, links, images, videos, spoilers, centered blocks) and drops
  * everything else, so API text can be rendered with {@html} safely.
  */
 export function sanitizeHtml(html: string | null | undefined): string {
@@ -55,29 +57,57 @@ function cleanChildren(parent: Node): void {
       continue;
     }
     if (node.classList.contains('youtube')) {
-      node.replaceWith(youtubeLink(node.id));
+      node.replaceWith(youtubeEmbed(node.id));
       continue;
     }
     if (node.tagName === 'VIDEO') {
-      node.replaceWith(videoLink(node));
+      node.replaceWith(videoEmbed(node));
       continue;
     }
     cleanChildren(node);
-    if (allowedTags.has(node.tagName)) cleanAttributes(node);
+    if (node.classList.contains('markdown_spoiler')) node.replaceWith(spoiler(node));
+    else if (allowedTags.has(node.tagName)) cleanAttributes(node);
     else node.replaceWith(...node.childNodes);
   }
 }
 
-// <-- Les lecteurs intégrés sont lourds : un lien vers le navigateur garde les profils légers -->
-function youtubeLink(idOrUrl: string): HTMLAnchorElement {
-  const url = webUrl.test(idOrUrl) ? idOrUrl : `https://www.youtube.com/watch?v=${encodeURIComponent(idOrUrl)}`;
-  return embedLink(url, '▶ Vidéo YouTube');
+// <-- Lecteur YouTube intégré comme sur AniList ; `loading="lazy"` ne le charge qu'une fois à l'écran -->
+function youtubeEmbed(idOrUrl: string): Node {
+  const id = youtubeIdPattern.test(idOrUrl) ? idOrUrl : idOrUrl.match(youtubeUrlPattern)?.[1];
+  if (!id) return webUrl.test(idOrUrl) ? embedLink(idOrUrl, '▶ Vidéo YouTube') : document.createTextNode('');
+  const frame = document.createElement('iframe');
+  frame.setAttribute('src', `https://www.youtube-nocookie.com/embed/${id}`);
+  frame.setAttribute('title', 'Vidéo YouTube');
+  frame.setAttribute('loading', 'lazy');
+  frame.setAttribute('allow', 'encrypted-media; fullscreen; picture-in-picture');
+  frame.setAttribute('allowfullscreen', '');
+  frame.className = 'youtube-embed';
+  return frame;
 }
 
-function videoLink(video: Element): Node {
-  const src = video.getAttribute('src') ?? video.querySelector('source')?.getAttribute('src') ?? '';
+// <-- Les webm d'AniList servent de GIF : lecture auto, en boucle et sans son -->
+function videoEmbed(source: Element): Node {
+  const src = source.getAttribute('src') ?? source.querySelector('source')?.getAttribute('src') ?? '';
   if (!webUrl.test(src)) return document.createTextNode('');
-  return embedLink(src, '▶ Vidéo');
+  const video = document.createElement('video');
+  video.setAttribute('src', src);
+  for (const flag of ['autoplay', 'loop', 'muted', 'playsinline']) video.setAttribute(flag, '');
+  return video;
+}
+
+// <-- Comme sur AniList, tout le contenu est caché (images comprises) jusqu'au clic sur l'étiquette -->
+function spoiler(source: Element): HTMLSpanElement {
+  const toggle = document.createElement('button');
+  toggle.setAttribute('type', 'button');
+  toggle.className = 'spoiler-toggle';
+  toggle.textContent = 'Spoiler, clique pour voir';
+  const content = document.createElement('span');
+  content.className = 'spoiler-content';
+  content.append(...source.childNodes);
+  const wrapper = document.createElement('span');
+  wrapper.className = 'spoiler';
+  wrapper.append(toggle, content);
+  return wrapper;
 }
 
 function embedLink(url: string, label: string): HTMLAnchorElement {
@@ -94,11 +124,9 @@ function cleanAttributes(element: Element): void {
   const href = element.getAttribute('href');
   const src = element.getAttribute('src');
   const width = element.getAttribute('width');
-  const isSpoiler = element.classList.contains('markdown_spoiler');
   const isCentered = element.getAttribute('align') === 'center';
   for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);
 
-  if (isSpoiler) element.className = 'spoiler';
   if (isCentered) element.className = 'centered';
 
   if (element.tagName === 'IMG') {

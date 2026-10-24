@@ -13,6 +13,8 @@ export interface Settings {
   episodeCompletionPercent: number;
   /** The share of an episode (in %) that must really be played; the rest may be skipped. */
   minimumWatchedPercent: number;
+  /** The about with live tags, kept on this PC only; empty when the about is plain text. */
+  aboutTemplate: string;
 }
 
 export type SettingsPatch = Partial<Omit<Settings, 'isLoggedIn'>>;
@@ -80,6 +82,8 @@ interface BridgeApi {
   'window.close': [void, boolean];
   'window.startDrag': [void, boolean];
   'window.startResize': [void, boolean];
+  /** Answers "window.closing": the app may now quit. */
+  'window.readyToQuit': [void, boolean];
   'update.check': [void, UpdateInfo | null];
   'update.install': [void, boolean];
 }
@@ -87,7 +91,11 @@ interface BridgeApi {
 export interface BridgeEvents {
   'player.started': { mediaId: number; episode: number };
   'player.watched': { mediaId: number; episode: number; title: string };
+  /** Sent at most every 15 s while mpv plays. */
+  'player.progress': { mediaId: number; episode: number; positionSeconds: number; durationSeconds: number };
   'player.closed': { mediaId: number; episode: number; watchedRatio: number };
+  /** The app is really quitting (not hiding to the tray); answer with "window.readyToQuit" within 5 s. */
+  'window.closing': Record<string, never>;
 }
 
 type Method = keyof BridgeApi;

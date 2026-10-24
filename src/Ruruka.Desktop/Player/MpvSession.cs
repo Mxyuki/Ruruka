@@ -11,16 +11,24 @@ public sealed record PlaybackTarget(int MediaId, int Episode, string FilePath, s
 /// <summary>Payload of "player.watched": the episode crossed the watched threshold.</summary>
 public sealed record EpisodeWatched(int MediaId, int Episode, string Title);
 
+/// <summary>Payload of "player.progress": where playback is, sent at most every <see cref="MpvSession.ProgressInterval"/>.</summary>
+public sealed record PlaybackProgress(int MediaId, int Episode, double PositionSeconds, double DurationSeconds);
+
 /// <summary>Runs one mpv process and follows its playback through mpv's JSON IPC over a named pipe.</summary>
 internal sealed class MpvSession
 {
     private static readonly TimeSpan PipeConnectTimeout = TimeSpan.FromSeconds(15);
+
+    // The UI turns progress into AniList profile updates, so a coarse pace is enough.
+    internal static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(15);
 
     private readonly PlaybackTarget _target;
     private readonly IBridgeEvents _events;
     private readonly Process _process;
     private readonly WatchTracker _tracker;
     private readonly string _pipeName = $"ruruka-mpv-{Guid.NewGuid():N}";
+    private readonly Stopwatch _sinceProgress = new();
+    private double _lastPosition;
 
     private MpvSession(string mpvPath, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events)
     {
@@ -114,10 +122,25 @@ internal sealed class MpvSession
         {
             case "duration":
                 _tracker.DurationSeconds = data.GetDouble();
+                ReportProgress(_lastPosition, isForced: true);
                 break;
-            case "time-pos" when _tracker.RecordPosition(data.GetDouble()):
-                _events.Emit("player.watched", new EpisodeWatched(_target.MediaId, _target.Episode, _target.Title));
+            case "time-pos":
+                var position = data.GetDouble();
+                if (_tracker.RecordPosition(position))
+                {
+                    _events.Emit("player.watched", new EpisodeWatched(_target.MediaId, _target.Episode, _target.Title));
+                }
+                ReportProgress(position);
                 break;
         }
+    }
+
+    // A known duration is sent at once, so the first profile update already shows it.
+    private void ReportProgress(double position, bool isForced = false)
+    {
+        _lastPosition = position;
+        if (!isForced && _sinceProgress.IsRunning && _sinceProgress.Elapsed < ProgressInterval) return;
+        _sinceProgress.Restart();
+        _events.Emit("player.progress", new PlaybackProgress(_target.MediaId, _target.Episode, position, _tracker.DurationSeconds));
     }
 }

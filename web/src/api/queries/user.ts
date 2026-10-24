@@ -46,6 +46,7 @@ interface FavouriteNode {
 export interface UserProfile {
   id: number;
   name: string;
+  /** Raw AniList markdown, rendered by `renderAniListMarkdown`. */
   about: string | null;
   avatar: UserAvatar;
   bannerImage: string | null;
@@ -72,7 +73,7 @@ const userProfileQuery = `
     User(name: $name) {
       id
       name
-      about(asHtml: true)
+      about
       avatar { large medium }
       bannerImage
       isFollowing
@@ -96,6 +97,25 @@ export function fetchUserProfile(name: string): Promise<UserProfile> {
     const { User } = await gql<{ User: UserProfile }>(userProfileQuery, { name });
     return User;
   });
+}
+
+const viewerAboutQuery = `
+  query { Viewer { about } }
+`;
+
+// <-- Jamais mis en cache : l'éditeur doit partir du texte réellement enregistré -->
+export async function fetchViewerAbout(): Promise<string> {
+  const { Viewer } = await gql<{ Viewer: { about: string | null } }>(viewerAboutQuery);
+  return Viewer.about ?? '';
+}
+
+const saveAboutMutation = `
+  mutation ($about: String) { UpdateUser(about: $about) { id } }
+`;
+
+export async function saveAbout(name: string, about: string): Promise<void> {
+  await gql(saveAboutMutation, { about });
+  invalidate(`user:${name}`);
 }
 
 const toggleFollowMutation = `

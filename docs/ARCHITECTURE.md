@@ -7,6 +7,7 @@
 | Native window, low RAM | .NET 8 WinForms host + WebView2 | WebView2 ships with Windows 11, so nothing extra is bundled. WinForms loads far less than WPF or Electron. |
 | UI | Svelte 5 + TypeScript + Vite | Compiles to small vanilla JS with no virtual DOM; runes give simple, explicit state. |
 | AniList | Plain `fetch` GraphQL client | Apollo/urql would add weight for features we don't need. |
+| Profile markdown | `marked` (+ AniList shortcuts in `lib/markdown.ts`) | AniList's `about(asHtml: true)` is only half converted (raw markdown left in centered blocks and spoilers), and the about editor needs a live preview. Rendering the raw markdown client-side, like anilist.co does, gives the profile and the preview the same output. Loaded only with the profile and editor pages. |
 | Fonts | `@fontsource/mochiy-pop-one`, `nunito`, `patrick-hand`, `courier-prime` (latin subsets) | Titles, body text, handwritten notes and case numbers, all bundled for offline use. |
 | Secrets | Windows DPAPI (`ProtectedData`) | The AniList token is encrypted per Windows user at rest. |
 | Playback | mpv + JSON IPC over a named pipe | mpv reports exact playback position, which watch tracking needs. Other players don't expose this reliably. |
@@ -77,10 +78,10 @@ Directory.Build.targets      drops the WPF assembly the WebView2 package always 
 web/src/
   main.ts, App.svelte        bootstrap, shell layout, router outlet
   styles/                    tokens.css (theme), base.css (reset + primitives)
-  lib/                       helpers with no app state: bridge, router, routes, format, html, nyaa, titleMatch
+  lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, nyaa, titleMatch
   api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts
     queries/                 GraphQL documents + typed fetchers, one file per domain
-  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, updates, toasts
+  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, updates, toasts
   components/                UI used by 2+ features (MediaCard, Modal, ScoreBadge…)
   pages/<feature>/           a route's page and its private sections
 ```
@@ -121,7 +122,9 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 |---|---|
 | `player.started` | `{ mediaId, episode }` |
 | `player.watched` | `{ mediaId, episode }`. Fired once the episode counts as watched (see Watch tracking) |
+| `player.progress` | `{ mediaId, episode, positionSeconds, durationSeconds }`. At most every 15 s while mpv plays, plus once as soon as the duration is known |
 | `player.closed` | `{ mediaId, episode, watchedRatio }` |
+| `window.closing` | `{}`. The app is really quitting; the UI answers with `window.readyToQuit` (the host waits 5 s at most) |
 
 The UI never navigates away from the app page. `MainForm` sends every outbound navigation
 and every `target="_blank"` link to the default browser.
@@ -137,6 +140,14 @@ share (50% by default), the session emits `player.watched`. Both values are perc
 `AppSettings`, validated in `SettingsModule`. `state/playback.svelte.ts` then updates the AniList entry only if
 `episode > progress`, using the same status rules as AniList: the first episode sets
 Watching, the last episode sets Completed.
+
+**Live profile.** An about that uses live tags (`[watching]…[/watching]`, `[idle]…[/idle]`,
+`${anime}`, `${episode}`, `${time}`… see `lib/aboutTemplate.ts`) is a *template*: it is saved in
+`AppSettings.AboutTemplate` on this PC and never sent to AniList as such. `state/liveAbout.svelte.ts`
+fills it from the current playback (`player.progress` / `player.closed`) and
+publishes the result with `UpdateUser(about)`, at most every 15 s (4 requests per minute, well under
+AniList's 30–90 per minute), and only when the text changed. While idle, the tags describe the anime
+most recently advanced in the list. Quitting the app publishes the idle version first. Editing the about on anilist.co is overwritten by the next update.
 
 **New downloads.** Opening a media page runs `library.refresh()`, so episodes downloaded since
 the last scan show up. Clicking an episode that isn't on disk first runs `library.rescan()`
@@ -174,6 +185,7 @@ and appear on the Library page for manual linking.
 | Change colours, fonts, spacing | `styles/tokens.css` only |
 | Change automatic interface sizes | `Windowing/InterfaceScale.cs` + `InterfaceScaleTests.cs` |
 | Add a setting | `AppSettings.cs` (+ `PublicSettings`) → `Settings` type in `lib/bridge.ts` → `pages/settings/` |
+| Support another AniList markdown shortcut (like `img220(…)`) | `lib/markdown.ts` (`expandAniListSyntax`) → an entry in `pages/profile/aboutSyntax.ts` for the editor guide |
 | Support another external search site (like Nyaa) | `lib/nyaa.ts` pattern → button component next to `NyaaButton.svelte` |
 
 ## Feature map
@@ -188,7 +200,9 @@ and appear on the Library page for manual linking.
 | Browse / search with filters | ✅ |
 | Character, staff, studio pages | ✅ |
 | Notifications with Nyaa buttons | ✅ |
-| Profile overview, favourites, rich "about" (images, centered blocks), recent activity | ✅ |
+| Profile overview, favourites, rich "about" (images, centered blocks, click-to-reveal spoilers, YouTube players), recent activity | ✅ |
+| About editor (`/about/edit`): markdown/HTML draft, live preview, tag guide with insert buttons | ✅ |
+| Live profile: about updated from mpv playback through local template tags | ✅ |
 | Social: following feed, following / followers with mutual badges, follow / unfollow | ✅ |
 | Activity likes, replies (read, write, like), posting a status | ✅ |
 | Local library + mpv playback + auto-sync | ✅ |

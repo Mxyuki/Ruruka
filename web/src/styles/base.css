@@ -330,21 +330,52 @@ button.chip:hover {
   background: var(--colorBlond);
 }
 
-.rich-text .spoiler {
-  border-radius: 4px;
-  background: var(--colorInk);
-  color: transparent;
+/* <-- Spoiler façon AniList : une étiquette à la place du contenu, images comprises, jusqu'au clic --> */
+.rich-text .spoiler-toggle {
+  display: inline-block;
+  margin: 2px 0;
+  padding: 1px 12px;
+  border: var(--outlineThin);
+  border-radius: var(--radiusPill);
+  background: var(--screentone), var(--colorMauve);
+  color: var(--textMain);
+  font-size: var(--fontSizeXs);
+  font-weight: 800;
   cursor: pointer;
-  transition: background var(--transitionFast), color var(--transitionFast);
 }
 
-.rich-text .spoiler:hover {
-  background: transparent;
-  color: inherit;
+.rich-text .spoiler-toggle:hover {
+  background: var(--screentone), var(--colorStrawberry);
+}
+
+.rich-text .spoiler-content,
+.rich-text .spoiler.is-revealed > .spoiler-toggle {
+  display: none;
+}
+
+.rich-text .spoiler.is-revealed > .spoiler-content {
+  display: contents;
+  cursor: pointer;
 }
 
 .rich-text img {
   display: inline-block;
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+.rich-text .youtube-embed {
+  display: inline-block;
+  width: min(100%, 560px);
+  aspect-ratio: 16 / 9;
+  border: var(--outline);
+  border-radius: var(--radiusSmall);
+  background: var(--colorInk);
+  vertical-align: middle;
+}
+
+.rich-text video {
   max-width: 100%;
   height: auto;
   vertical-align: middle;

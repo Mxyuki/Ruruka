@@ -9,11 +9,14 @@
   import TitleBar from './components/TitleBar.svelte';
   import Toasts from './components/Toasts.svelte';
   import UpdateDialog from './components/UpdateDialog.svelte';
+  import { invoke, on } from './lib/bridge';
   import { router } from './lib/router.svelte';
   import { routes } from './lib/routes';
   import { installSparkles } from './lib/sparkle';
+  import { installSpoilers } from './lib/spoilers';
   import SetupPage from './pages/setup/SetupPage.svelte';
   import { library } from './state/library.svelte';
+  import { liveAbout } from './state/liveAbout.svelte';
   import { mediaList } from './state/mediaList.svelte';
   import { playback } from './state/playback.svelte';
   import { session } from './state/session.svelte';
@@ -27,9 +30,20 @@
 
   onMount(() => {
     playback.init();
+    liveAbout.init();
     void session.init();
     void updates.check();
-    return installSparkles();
+    // <-- Avant de quitter : le profil repasse au repos, puis le host peut fermer -->
+    on('window.closing', async () => {
+      await liveAbout.publishIdle();
+      await invoke('window.readyToQuit');
+    });
+    const uninstallSparkles = installSparkles();
+    const uninstallSpoilers = installSpoilers();
+    return () => {
+      uninstallSparkles();
+      uninstallSpoilers();
+    };
   });
 
   // <-- Chargement de la liste et de la bibliothèque une fois connecté (hors suivi, sinon l'effet boucle) -->

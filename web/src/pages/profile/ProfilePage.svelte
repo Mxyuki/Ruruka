@@ -3,12 +3,13 @@
   import { fetchUserProfile, toggleFollow, type TypeStatistics } from '../../api/queries/user';
   import ActivityFeed from '../../components/ActivityFeed.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Icon from '../../components/Icon.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
   import Section from '../../components/Section.svelte';
-  import { sanitizeHtml } from '../../lib/html';
+  import { renderAniListMarkdown } from '../../lib/markdown';
   import type { RouteParams } from '../../lib/router.svelte';
-  import { characterPath, staffPath, studioPath } from '../../lib/routes';
+  import { aboutEditorPath, characterPath, staffPath, studioPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
 
@@ -61,9 +62,19 @@
   </header>
 
   <div class="page">
-    {#if user.about}
+    {#if user.about || isViewer}
       <section class="about card" class:is-collapsible={isAboutLong} class:is-expanded={isAboutExpanded}>
-        <div class="rich-text" bind:clientHeight={aboutHeight}>{@html sanitizeHtml(user.about)}</div>
+        {#if isViewer}
+          <a class="btn btn-sm edit" href="#{aboutEditorPath}">
+            <Icon name="edit" size={14} />
+            Modifier
+          </a>
+        {/if}
+        {#if user.about}
+          <div class="rich-text" bind:clientHeight={aboutHeight}>{@html renderAniListMarkdown(user.about)}</div>
+        {:else}
+          <p class="empty">Ton dossier est encore vierge. Écris quelques lignes pour te présenter aux autres détectives !</p>
+        {/if}
         {#if isAboutLong}
           <button class="btn btn-ghost btn-sm toggle" type="button" onclick={() => (isAboutExpanded = !isAboutExpanded)}>
             {isAboutExpanded ? 'Voir moins' : 'Lire la suite'}
@@ -208,6 +219,19 @@
 
   .about.is-expanded {
     max-height: none;
+  }
+
+  /* <-- Le bouton flotte en haut à droite : le texte s'écoule autour au lieu de passer dessous --> */
+  .edit {
+    position: relative;
+    z-index: 1;
+    float: right;
+    margin: 0 0 var(--space2) var(--space3);
+  }
+
+  .empty {
+    font-family: var(--fontHand);
+    font-size: var(--fontSizeLg);
   }
 
   .about .toggle {

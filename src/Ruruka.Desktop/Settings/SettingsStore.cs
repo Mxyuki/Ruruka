@@ -31,6 +31,7 @@ public sealed class SettingsStore
         IsCloseToTray = patch.IsCloseToTray ?? settings.IsCloseToTray,
         EpisodeCompletionPercent = patch.EpisodeCompletionPercent ?? settings.EpisodeCompletionPercent,
         MinimumWatchedPercent = patch.MinimumWatchedPercent ?? settings.MinimumWatchedPercent,
+        AboutTemplate = patch.AboutTemplate ?? settings.AboutTemplate,
     });
 
     public string? ReadToken()

@@ -16,6 +16,7 @@ export const routes: RouteDefinition[] = [
   { pattern: '/social', load: page(() => import('../pages/social/SocialPage.svelte')) },
   { pattern: '/notifications', load: page(() => import('../pages/notifications/NotificationsPage.svelte')) },
   { pattern: '/user/:name', load: page(() => import('../pages/profile/ProfilePage.svelte')) },
+  { pattern: '/about/edit', load: page(() => import('../pages/profile/AboutEditorPage.svelte')) },
   { pattern: '/library', load: page(() => import('../pages/library/LibraryPage.svelte')) },
   { pattern: '/settings', load: page(() => import('../pages/settings/SettingsPage.svelte')) },
 ];
@@ -25,6 +26,7 @@ export const characterPath = (id: number) => `/character/${id}`;
 export const staffPath = (id: number) => `/staff/${id}`;
 export const studioPath = (id: number) => `/studio/${id}`;
 export const userPath = (name: string) => `/user/${encodeURIComponent(name)}`;
+export const aboutEditorPath = '/about/edit';
 
 const anilistLink = /^https?:\/\/anilist\.co\/(anime|manga|character|staff|studio|user)\/([^/?#]+)/;
 
