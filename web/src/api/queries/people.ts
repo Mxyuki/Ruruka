@@ -20,7 +20,19 @@ export interface CharacterDetails {
   bloodType: string | null;
   dateOfBirth: FuzzyDate;
   favourites: number;
-  media: { characterRole: string; voiceActors: NamedNode[]; node: MediaSummary }[];
+  media: { characterRole: string; voiceRoles: VoiceRole[]; node: MediaSummary }[];
+}
+
+export interface VoiceRole {
+  voiceActor: NamedNode;
+  /** AniList's free-text precision, e.g. "Child" when another seiyuu voices the adult. */
+  roleNotes: string | null;
+}
+
+interface RawCharacterEdge {
+  characterRole: string;
+  voiceActorRoles: { voiceActor: NamedNode | null; roleNotes: string | null }[];
+  node: MediaSummary;
 }
 
 const characterQuery = `
@@ -38,7 +50,7 @@ const characterQuery = `
       media(sort: POPULARITY_DESC, perPage: 30) {
         edges {
           characterRole
-          voiceActors(language: JAPANESE) { id name { userPreferred } image { medium } }
+          voiceActorRoles(language: JAPANESE) { roleNotes voiceActor { id name { userPreferred } image { medium } } }
           node { ${mediaSummaryFields} }
         }
       }
@@ -48,11 +60,16 @@ const characterQuery = `
 
 export function fetchCharacter(id: number): Promise<CharacterDetails> {
   return cached(`character:${id}`, 10 * minuteMs, async () => {
-    const { Character } = await gql<{ Character: Omit<CharacterDetails, 'media'> & { media: { edges: CharacterDetails['media'] } } }>(
+    const { Character } = await gql<{ Character: Omit<CharacterDetails, 'media'> & { media: { edges: RawCharacterEdge[] } } }>(
       characterQuery,
       { id },
     );
-    return { ...Character, media: Character.media.edges };
+    // <-- AniList renvoie null pour un seiyuu supprimé ou masqué -->
+    const media = Character.media.edges.map(({ voiceActorRoles, ...edge }) => ({
+      ...edge,
+      voiceRoles: voiceActorRoles.filter((role): role is VoiceRole => role.voiceActor !== null),
+    }));
+    return { ...Character, media };
   });
 }
 
@@ -108,7 +125,7 @@ type RawStaff = Omit<StaffDetails, 'characterRoles' | 'staffRoles'> & {
 
 interface CharacterMediaEdge {
   characterRole: string;
-  characters: (NamedNode & { favourites: number })[];
+  characters: ((NamedNode & { favourites: number }) | null)[];
   node: MediaSummary & { startDate: { year: number | null } };
 }
 
@@ -133,6 +150,8 @@ async function fetchVoicedCharacters(id: number): Promise<VoicedCharacter[]> {
     const pages = Array.from({ length: pagesPerRequest }, (_, offset) => Staff[`p${offset}`]).filter((page) => page !== undefined);
     for (const edge of pages.flatMap((page) => page.edges)) {
       for (const character of edge.characters) {
+        // <-- AniList renvoie null pour un personnage supprimé ou masqué -->
+        if (!character) continue;
         // <-- AniList range les œuvres sans date en tête : une œuvre datée passe devant elles -->
         const known = seen.get(character.id);
         const year = edge.node.startDate.year;

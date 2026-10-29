@@ -1,4 +1,4 @@
-import type { FuzzyDate, MediaListStatus, MediaSeason, MediaType, ScoreFormat } from '../api/types';
+import type { FuzzyDate, MediaListStatus, MediaSeason, MediaSummary, MediaType, ScoreFormat } from '../api/types';
 
 const enumAcronyms = new Set(['TV', 'OVA', 'ONA']);
 const enumLabels: Record<string, string> = {
@@ -14,6 +14,13 @@ export function formatEnum(value: string | null | undefined): string {
     .split('_')
     .map((word) => (enumAcronyms.has(word) ? word : word.charAt(0) + word.slice(1).toLowerCase()))
     .join(' ');
+}
+
+/** What kind of work a media is: "Anime", "Film", "Manga", "Light novel"… */
+export function formatContentKind(media: Pick<MediaSummary, 'type' | 'format'>): string {
+  const isSeries = media.format === 'TV' || media.format === 'TV_SHORT';
+  if (media.type === 'ANIME' && (isSeries || !media.format)) return 'Anime';
+  return formatEnum(media.format ?? media.type);
 }
 
 const statusLabels: Record<MediaType, Record<MediaListStatus, string>> = {

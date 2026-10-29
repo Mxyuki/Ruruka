@@ -229,12 +229,12 @@
     max-height: none;
   }
 
-  /* <-- Le bouton flotte en haut à droite : le texte s'écoule autour au lieu de passer dessous --> */
+  /* <-- Le bouton se pose par-dessus le texte : un float décalerait les blocs centrés vers la gauche --> */
   .edit {
-    position: relative;
+    position: absolute;
+    top: var(--space3);
+    right: var(--space3);
     z-index: 1;
-    float: right;
-    margin: 0 0 var(--space2) var(--space3);
   }
 
   .empty {

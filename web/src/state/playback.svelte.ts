@@ -12,6 +12,17 @@ export interface SkipPrompt {
   hasSuggestedFile: boolean;
 }
 
+/** The user's answer to a skip prompt: play `episode`, then chain the next ones up to `lastEpisode`. */
+interface PlayChoice {
+  episode: number;
+  lastEpisode: number;
+}
+
+interface Playlist {
+  mediaId: number;
+  lastEpisode: number;
+}
+
 interface NowPlaying {
   media: MediaSummary;
   episode: number;
@@ -22,8 +33,9 @@ interface NowPlaying {
 class Playback {
   nowPlaying = $state<NowPlaying | null>(null);
   skipPrompt = $state<SkipPrompt | null>(null);
-  private resolveSkipPrompt: ((episode: number | null) => void) | null = null;
+  private resolveSkipPrompt: ((choice: PlayChoice | null) => void) | null = null;
   private sessions = new Map<string, NowPlaying>();
+  private playlist: Playlist | null = null;
 
   init(): void {
     on('player.watched', ({ mediaId, episode }) => this.handleWatched(mediaId, episode));
@@ -42,17 +54,20 @@ class Playback {
     const isRewatch = entry?.status === 'COMPLETED';
     const shouldWarn = session.settings?.hasSkipWarning && !isRewatch && episode > suggested;
 
-    const chosen = shouldWarn ? await this.askAboutSkip(media, episode, suggested) : episode;
-    if (chosen !== null) await this.play(media, chosen);
+    const choice = shouldWarn ? await this.askAboutSkip(media, episode, suggested) : { episode, lastEpisode: episode };
+    if (!choice) return;
+    this.playlist = choice.lastEpisode > choice.episode ? { mediaId: media.id, lastEpisode: choice.lastEpisode } : null;
+    await this.play(media, choice.episode);
   }
 
-  answerSkipPrompt(episode: number | null): void {
-    this.resolveSkipPrompt?.(episode);
+  /** Answers the skip prompt; a `lastEpisode` past `episode` chains the following episodes in mpv on their own. */
+  answerSkipPrompt(episode: number | null, lastEpisode?: number): void {
+    this.resolveSkipPrompt?.(episode === null ? null : { episode, lastEpisode: lastEpisode ?? episode });
     this.resolveSkipPrompt = null;
     this.skipPrompt = null;
   }
 
-  private askAboutSkip(media: MediaSummary, requested: number, suggested: number): Promise<number | null> {
+  private askAboutSkip(media: MediaSummary, requested: number, suggested: number): Promise<PlayChoice | null> {
     this.skipPrompt = { media, requested, suggested, hasSuggestedFile: this.hasEpisodeFile(media.id, suggested) };
     return new Promise((resolve) => {
       this.resolveSkipPrompt = resolve;
@@ -91,7 +106,7 @@ class Playback {
 
   private handleEnded(mediaId: number, episode: number): void {
     const current = this.sessions.get(sessionKey(mediaId, episode));
-    if (current) this.offerNext(current);
+    if (current) this.continueAfter(current, true);
   }
 
   private handleClosed(mediaId: number, episode: number): void {
@@ -99,7 +114,32 @@ class Playback {
     const finished = this.sessions.get(key);
     this.sessions.delete(key);
     if (this.nowPlaying?.media.id === mediaId && this.nowPlaying.episode === episode) this.nowPlaying = null;
-    if (finished) this.offerNext(finished);
+    if (finished) this.continueAfter(finished, false);
+  }
+
+  // <-- En enchaînement, l'épisode suivant part tout seul dans la même fenêtre mpv ; sinon on le propose -->
+  private continueAfter(finished: NowPlaying, hasReachedEnd: boolean): void {
+    if (finished.hasOfferedNext) return;
+    const playlist = this.playlist;
+    const next = finished.episode + 1;
+    if (playlist?.mediaId !== finished.media.id || next > playlist.lastEpisode) {
+      this.offerNext(finished);
+      return;
+    }
+    // <-- Sans « garder mpv ouvert », mpv se ferme seul en fin d'épisode : une fermeture avant « vu » est un arrêt voulu -->
+    if (!hasReachedEnd && !finished.isWatched) {
+      this.playlist = null;
+      return;
+    }
+    finished.hasOfferedNext = true;
+    if (!this.hasEpisodeFile(finished.media.id, next)) {
+      this.playlist = null;
+      toasts.show(`Fin de l’enchaînement : l’épisode ${next} n’est pas dans ton dossier.`, 'info');
+      return;
+    }
+    if (next === playlist.lastEpisode) this.playlist = null;
+    toasts.show(`On enchaîne avec l’épisode ${next} !`, 'info');
+    void this.play(finished.media, next);
   }
 
   private offerNext(finished: NowPlaying): void {

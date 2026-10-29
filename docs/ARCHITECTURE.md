@@ -243,7 +243,10 @@ those pages from the API cache and restores the scroll offset.
 
 **Skip warning.** Before playing, `playback.requestPlay` compares the episode to the list
 progress. If it's more than one ahead, it shows a dialog suggesting `progress + 1`. The user
-can still play the episode they picked.
+can still play the episode they picked, or chain from `progress + 1` to it: the store keeps a
+playlist and, on `player.ended` (or on `player.closed` once the episode counted as watched, for
+mpv without keep-open), plays the next file in the same mpv window until the picked episode.
+Closing mpv earlier, a missing file or playing anything else ends the playlist.
 
 **Folder matching.** `library.scan` (host) returns each series folder with a cleaned title guess
 and parsed episode numbers. A direct sub-folder of the root is one series, unless it's a

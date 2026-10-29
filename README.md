@@ -41,7 +41,8 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
   le suivant et il s'ouvre dans la même fenêtre, avec le même suivi. Pratique pour regarder entre
   amis en partage d'écran sur Discord.
 - **Un petit avertissement** si tu lances l'épisode 20 alors que tu en es au 16. Ruruka te
-  propose le 17, mais tu restes libre.
+  propose le 17, mais tu restes libre, ou d'enchaîner du 17 au 20 : chaque épisode fini laisse
+  sa place au suivant dans mpv, sans rien toucher.
 - **Boutons de recherche** sur chaque anime, chaque épisode manquant, chaque notification de
   sortie. Indique ton site de recherche dans **Réglages → Sites** ; sans site, les boutons
   restent cachés.
@@ -67,7 +68,9 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
 - **Un anime au hasard.** Sur l'accueil, tire au sort ce que tu vas regarder : dans tes anime en
   cours, ta liste « À voir », ou n'importe quel anime populaire que tu n'as pas terminé.
 - **Personnes.** Cherche un personnage, un seiyuu ou un membre du staff. La page d'un seiyuu
-  montre tous ses personnages, chacun une seule fois, triables par date, favoris ou nom.
+  montre tous ses personnages, chacun une seule fois, triables par date, favoris ou nom. La page
+  d'un personnage montre ses seiyuu (avec « Enfant », « Adulte »… quand AniList le précise) et le
+  type de chaque œuvre où il apparaît.
 - **Ta fiche, dans ton ordre.** Dans les réglages, choisis dans quel ordre s'affichent les
   sections d'un anime ou d'un manga (bouton « Réinitialiser » pour revenir à l'original).
 - **Une recherche poussée.** Dans Explorer, combine plusieurs genres et mots-clés, exclus-en

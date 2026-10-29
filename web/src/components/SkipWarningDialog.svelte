@@ -6,7 +6,7 @@
 </script>
 
 {#if prompt}
-  <Modal open title="Attends, détective !" width="460px" onclose={() => playback.answerSkipPrompt(null)}>
+  <Modal open title="Attends, détective !" width="620px" onclose={() => playback.answerSkipPrompt(null)}>
     <div class="clue">
       <img src="./ruruka.png" alt="" width="64" height="64" />
       <p>
@@ -20,13 +20,25 @@
         Regarder le {prompt.requested} quand même
       </button>
       <button
-        class="btn btn-primary"
+        class="btn btn-ghost"
         type="button"
         disabled={!prompt.hasSuggestedFile}
         title={prompt.hasSuggestedFile ? undefined : `L'épisode ${prompt.suggested} n'est pas téléchargé`}
         onclick={() => playback.answerSkipPrompt(prompt.suggested)}
       >
         Regarder le {prompt.suggested}
+      </button>
+      <!-- Enchaînement : chaque épisode fini laisse sa place au suivant dans la même fenêtre mpv -->
+      <button
+        class="btn btn-primary"
+        type="button"
+        disabled={!prompt.hasSuggestedFile}
+        title={prompt.hasSuggestedFile
+          ? `Joue le ${prompt.suggested}, puis chaque épisode à la suite jusqu'au ${prompt.requested}`
+          : `L'épisode ${prompt.suggested} n'est pas téléchargé`}
+        onclick={() => playback.answerSkipPrompt(prompt.suggested, prompt.requested)}
+      >
+        Enchaîner du {prompt.suggested} au {prompt.requested}
       </button>
     {/snippet}
   </Modal>
