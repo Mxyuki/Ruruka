@@ -9,10 +9,10 @@
   import PageHeader from '../../components/PageHeader.svelte';
   import Sticker from '../../components/Sticker.svelte';
   import TextComposer from '../../components/TextComposer.svelte';
+  import UserCard from '../../components/UserCard.svelte';
   import { userPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
-  import UserCard from './UserCard.svelte';
 
   type Tab = 'activity' | 'following' | 'followers';
   type Filter = 'all' | 'mutual' | 'oneWay';

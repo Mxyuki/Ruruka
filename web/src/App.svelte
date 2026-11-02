@@ -16,6 +16,7 @@
   import { installSparkles } from './lib/sparkle';
   import { installSpoilers } from './lib/spoilers';
   import SetupPage from './pages/setup/SetupPage.svelte';
+  import { groupWatch } from './state/groupWatch.svelte';
   import { library } from './state/library.svelte';
   import { liveAbout } from './state/liveAbout.svelte';
   import { mediaList } from './state/mediaList.svelte';
@@ -56,10 +57,12 @@
     document.addEventListener('click', openLinkOnAniList);
     playback.init();
     liveAbout.init();
+    groupWatch.init();
     void session.init();
     void updates.check();
-    // <-- Avant de quitter : le profil repasse au repos, puis le host peut fermer -->
+    // <-- Avant de quitter : la séance est prévenue, le profil repasse au repos, puis le host peut fermer -->
     on('window.closing', async () => {
+      await groupWatch.leave();
       await liveAbout.publishIdle();
       await invoke('window.readyToQuit');
     });

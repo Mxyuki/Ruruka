@@ -30,6 +30,9 @@
   let showsAllUpNext = $state(false);
   let recentAirings = $state<RecentAiring[]>([]);
 
+  // <-- L'app peut rester ouverte des heures : à chaque retour sur l'accueil, la liste suit les épisodes sortis entre-temps -->
+  mediaList.refreshIfAired('ANIME').catch((error: unknown) => toasts.error(error, 'Impossible de rafraîchir les prochains épisodes'));
+
   fetchRecentAirings(Math.floor(Date.now() / 1000) - freshEpisodeHours * 3600)
     .then((airings) => (recentAirings = airings))
     .catch((error: unknown) => toasts.error(error, 'Impossible de vérifier les nouveaux épisodes'));

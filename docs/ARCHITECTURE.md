@@ -10,6 +10,7 @@
 | Profile markdown | `marked` (+ AniList shortcuts in `lib/markdown.ts`) | AniList's `about(asHtml: true)` is only half converted (raw markdown left in centered blocks and spoilers), and the about editor needs a live preview. Rendering the raw markdown client-side, like anilist.co does, gives the profile and the preview the same output. Loaded only with the profile and editor pages. |
 | Fonts | `@fontsource/mochiy-pop-one`, `nunito`, `patrick-hand`, `courier-prime` (latin subsets) | Titles, body text, handwritten notes and case numbers, all bundled for offline use. |
 | Secrets | Windows DPAPI (`ProtectedData`) | The AniList token is encrypted per Windows user at rest. |
+| Group watch relay | Public MQTT broker (`broker.emqx.io`) over secure WebSocket, a ~200-line MQTT 3.1.1 client in `api/watchRelay.ts` | Friends anywhere connect outward, so nobody opens a port and no Ruruka server has to run. MQTT gives retained messages (a late friend gets the current episode at once) and a last will (friends learn when the host drops). mqtt.js would add ~100 KB for the four packets used. |
 | Playback | mpv + JSON IPC over a named pipe | mpv reports exact playback position, which watch tracking needs. Other players don't expose this reliably. |
 
 Runtime memory levers already in place: workstation non-concurrent GC in the host,
@@ -80,10 +81,10 @@ Directory.Build.targets      drops the WPF assembly the WebView2 package always 
 web/src/
   main.ts, App.svelte        bootstrap, shell layout, router outlet
   styles/                    tokens.css (theme), base.css (reset + primitives)
-  lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, searchSite, titleMatch
-  api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts, anisongdb.ts (anime songs, not AniList)
+  lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, searchSite, titleMatch, watchCode
+  api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts, anisongdb.ts (anime songs, not AniList), mangaSite.ts, watchRelay.ts (group watch relay)
     queries/                 GraphQL documents + typed fetchers, one file per domain
-  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, updates, toasts
+  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, groupWatch, updates, toasts
   components/                UI used by 2+ features (MediaCard, Modal, ScoreBadge…)
   pages/<feature>/           a route's page and its private sections
 ```
@@ -191,6 +192,9 @@ crossing into the next or previous chapter at the ends; images load straight fro
 servers the API names, two pages ahead); reaching a chapter's last page calls
 `mediaList.recordRead`, which raises the chapter and volume progress only when they go forward.
 Publisher-hosted chapters (`externalUrl`) open in the browser.
+The site's image servers answer requests that carry another site as referrer with a « read this on
+the site » placeholder, and it is tightening browser checks: when a page still fails from both servers,
+the reader offers « Lire sur le site » (`<site>/chapter/<id>` in the browser) rather than working around it.
 
 **Voice actors.** `fetchStaff` walks all `characterMedia` (25 per page, 5 pages per request through
 aliases, oldest first) and keeps each character once, at its first dated appearance.
@@ -218,6 +222,24 @@ by default. While one is empty, `session.searchSite` / `mangaSite` / `songFileHo
 feature behind it stays hidden. `lib/siteAddress.ts` (and `Settings/SiteAddress.cs` on the host) adds
 `https://` when missing; the host only checks length and spaces, so a wrong address is saved and simply
 finds nothing. Search links are `<site>/?f=0&c=<category>&q=<query>` (`lib/searchSite.ts`).
+
+**Group watch.** `/group-watch` (sidebar « Séance »). The host opens a session and gets a code
+(`lib/watchCode.ts`, 10 unambiguous characters, ~50 bits). `state/groupWatch.svelte.ts` follows the host's
+own `player.started` / `progress` / `watched` / `closed` events and publishes one retained `state` message
+per change. Each friend's Ruruka feeds that state into `playback.followRemote` and `liveAbout.trackPosition`,
+so the sidebar, title bar, live about and list progress behave as if the episode played in their own mpv;
+`playback.recordRemoteWatched` applies the usual rules (only forward, status changes as AniList does).
+Only a « vu » change seen live counts, so joining after the host's threshold doesn't tick the episode.
+The friend's own mpv keeps priority while it plays. Friends announce themselves on a `friends` channel
+(their last will says goodbye). The host's last will is a retained `lost` state: friends wait for the host
+to reconnect, and only a closed session (`ended`, also sent when the app quits) ends theirs. A dropped
+connection is retried 5 times with the same code. The topic is an HKDF hash of the code and every
+message is AES-GCM sealed with a key derived from it, so the public broker (where anyone can list topics)
+can neither read nor forge session messages.
+
+**Airing countdowns** are computed from `airingAt` at render time (`formatCountdown`), not from
+AniList's `timeUntilAiring` snapshot, and each visit to the home page reloads the anime list when an
+episode it announces has aired since it was loaded (`mediaList.refreshIfAired`).
 
 **Home hero.** The « affaire du jour » is the newest AniList airing notification from the last 12 hours
 whose episode the viewer hasn't watched yet (`fetchRecentAirings`, read with
@@ -302,7 +324,10 @@ and appear on the Library page for manual linking.
 | Social: following feed, following / followers with mutual badges, follow / unfollow | ✅ |
 | Activity likes, replies (read, write, like), posting a status | ✅ |
 | Local library + mpv playback + auto-sync | ✅ |
+| Group watch: a code shared with friends; their list and live about follow the host's mpv | ✅ |
 | Editing / deleting your own activity and replies, activity subscriptions | 🔜 next: `api/queries/activity.ts` + `components/ActivityCard.svelte` |
-| Reviews, forum, recommendations voting | 🔜 |
-| User stats deep-dive (genres, staff, years) | 🔜 |
+| A user's reviews (`/user/:name/reviews`, read-only) | ✅ |
+| Writing reviews, forum, recommendations voting | 🔜 |
+| User stats deep-dive (`/user/:name/stats`: scores, years, formats, statuses, countries, genres, tags, studios, seiyuu, staff) | ✅ |
+| A user's following / followers with the ones shared with the viewer (`/user/:name/social`) | ✅ |
 | Account settings editing (score format, title language) | 🔜. Still done on anilist.co for now |

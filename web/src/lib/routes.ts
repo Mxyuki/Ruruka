@@ -18,8 +18,12 @@ export const routes: RouteDefinition[] = [
   { pattern: '/social', load: page(() => import('../pages/social/SocialPage.svelte')) },
   { pattern: '/notifications', load: page(() => import('../pages/notifications/NotificationsPage.svelte')) },
   { pattern: '/user/:name', load: page(() => import('../pages/profile/ProfilePage.svelte')) },
+  { pattern: '/user/:name/social', load: page(() => import('../pages/profile/UserSocialPage.svelte')) },
+  { pattern: '/user/:name/stats', load: page(() => import('../pages/profile/UserStatsPage.svelte')) },
+  { pattern: '/user/:name/reviews', load: page(() => import('../pages/profile/UserReviewsPage.svelte')) },
   { pattern: '/user/:name/list/:type', load: page(() => import('../pages/list/ListPage.svelte')) },
   { pattern: '/about/edit', load: page(() => import('../pages/profile/AboutEditorPage.svelte')) },
+  { pattern: '/group-watch', load: page(() => import('../pages/groupWatch/GroupWatchPage.svelte')) },
   { pattern: '/library', load: page(() => import('../pages/library/LibraryPage.svelte')) },
   { pattern: '/settings', load: page(() => import('../pages/settings/SettingsPage.svelte')) },
 ];
@@ -29,6 +33,8 @@ export const characterPath = (id: number) => `/character/${id}`;
 export const staffPath = (id: number) => `/staff/${id}`;
 export const studioPath = (id: number) => `/studio/${id}`;
 export const userPath = (name: string) => `/user/${encodeURIComponent(name)}`;
+type ProfileSection = 'social' | 'stats' | 'reviews';
+export const userSectionPath = (name: string, section: ProfileSection) => `${userPath(name)}/${section}`;
 export const userListPath = (name: string, type: MediaType) => `${userPath(name)}/list/${type === 'MANGA' ? 'manga' : 'anime'}`;
 export const aboutEditorPath = '/about/edit';
 
@@ -56,6 +62,8 @@ export function anilistUrlFor(path: string): string | null {
   if (kind === 'character' || kind === 'staff' || kind === 'studio') return `${anilistSite}/${kind}/${id}`;
   if (kind === 'search') return `${anilistSite}/search/${id}`;
   if (kind !== 'user') return null;
+  if (section === 'social' || section === 'reviews') return `${anilistSite}/user/${id}/${section}`;
+  if (section === 'stats') return `${anilistSite}/user/${id}/stats/anime/overview`;
   if (section === 'list') return `${anilistSite}/user/${id}/${listType === 'manga' ? 'mangalist' : 'animelist'}`;
   return `${anilistSite}/user/${id}`;
 }

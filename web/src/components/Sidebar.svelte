@@ -1,6 +1,7 @@
 <script lang="ts">
   import { isActive } from '../lib/router.svelte';
   import { userPath } from '../lib/routes';
+  import { groupWatch } from '../state/groupWatch.svelte';
   import { playback } from '../state/playback.svelte';
   import { session } from '../state/session.svelte';
   import Icon, { type IconName } from './Icon.svelte';
@@ -20,6 +21,7 @@
     { label: 'Explorer', path: '/search/anime', icon: 'search' },
     { label: 'Personnes', path: '/people', icon: 'user' },
     { label: 'Amis', path: '/social', icon: 'users' },
+    { label: 'Séance', path: '/group-watch', icon: 'cast', badge: groupWatch.role === 'hosting' ? groupWatch.friends.length : undefined },
     { label: 'Bibliothèque', path: '/library', icon: 'folder' },
     { label: 'Nouvelles', path: '/notifications', icon: 'bell', badge: session.viewer?.unreadNotificationCount },
   ]);
@@ -50,7 +52,7 @@
       <a class="now-playing" href="#/media/{playback.nowPlaying.media.id}">
         <Icon name="play" size={14} filled />
         <span>
-          <small>En lecture · ép. {playback.nowPlaying.episode}</small>
+          <small>{playback.nowPlaying.isRemote ? 'En séance' : 'En lecture'} · ép. {playback.nowPlaying.episode}</small>
           {playback.nowPlaying.media.title.userPreferred}
         </span>
       </a>

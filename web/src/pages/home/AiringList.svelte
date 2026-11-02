@@ -19,7 +19,7 @@
         <li>
           <a href="#{mediaPath(entry.media.id)}">
             <span class="title">{entry.media.title.userPreferred}</span>
-            <span class="when">ép. {airing.episode} · {formatCountdown(airing.timeUntilAiring)}</span>
+            <span class="when">ép. {airing.episode} · {formatCountdown(airing.airingAt)}</span>
           </a>
         </li>
       {/if}

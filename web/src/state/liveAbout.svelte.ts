@@ -31,8 +31,19 @@ class LiveAbout {
 
   init(): void {
     // <-- Pas de mise à jour sur « player.started » : la durée n'est connue qu'au premier « player.progress » -->
-    on('player.progress', (position) => this.track(position));
-    on('player.closed', () => this.track(null));
+    on('player.progress', (position) => this.trackPosition(position));
+    on('player.closed', () => this.trackPosition(null));
+  }
+
+  /** The playback position to show, from this PC's mpv or a friend's during a group watch; null once it stops. */
+  trackPosition(position: Position | null): void {
+    this.position = position;
+    if (!hasLiveTags(this.template) || this.pushTimer) return;
+    const delay = Math.max(settleDelayMs, this.lastPushAt + minPushIntervalMs - Date.now());
+    this.pushTimer = setTimeout(() => {
+      this.pushTimer = null;
+      void this.pushTemplate();
+    }, delay);
   }
 
   /** Publishes `text` as the about; with live tags it is kept as the template and published filled in. */
@@ -61,16 +72,6 @@ class LiveAbout {
     } catch (error) {
       toasts.error(error, 'Impossible de remettre ton profil au repos');
     }
-  }
-
-  private track(position: Position | null): void {
-    this.position = position;
-    if (!hasLiveTags(this.template) || this.pushTimer) return;
-    const delay = Math.max(settleDelayMs, this.lastPushAt + minPushIntervalMs - Date.now());
-    this.pushTimer = setTimeout(() => {
-      this.pushTimer = null;
-      void this.pushTemplate();
-    }, delay);
   }
 
   private async pushTemplate(): Promise<void> {

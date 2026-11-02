@@ -28,6 +28,8 @@ interface NowPlaying {
   episode: number;
   isWatched: boolean;
   hasOfferedNext: boolean;
+  /** Played on a friend's mpv during a group watch, not on this PC. */
+  isRemote: boolean;
 }
 
 class Playback {
@@ -82,7 +84,7 @@ class Playback {
     }
     try {
       await invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title: media.title.userPreferred });
-      const started = { media, episode, isWatched: false, hasOfferedNext: false };
+      const started = { media, episode, isWatched: false, hasOfferedNext: false, isRemote: false };
       // <-- L'épisode remplace le précédent dans la même fenêtre mpv, qui ne sera donc jamais « fermé » -->
       if (this.nowPlaying) this.sessions.delete(sessionKey(this.nowPlaying.media.id, this.nowPlaying.episode));
       this.sessions.set(sessionKey(media.id, episode), started);
@@ -90,6 +92,32 @@ class Playback {
     } catch (error) {
       toasts.error(error, 'Impossible de lancer mpv');
     }
+  }
+
+  /** Follows the episode a friend plays during a group watch; returns false while this PC's own mpv plays. */
+  followRemote(media: MediaSummary, episode: number): boolean {
+    const current = this.nowPlaying;
+    if (current && !current.isRemote) return false;
+    if (current?.media.id === media.id && current.episode === episode) return true;
+    if (current) this.sessions.delete(sessionKey(current.media.id, current.episode));
+    // <-- Chez un ami, l'épisode suivant se lance chez l'hôte : rien à proposer ici -->
+    const followed = { media, episode, isWatched: false, hasOfferedNext: true, isRemote: true };
+    this.sessions.set(sessionKey(media.id, episode), followed);
+    this.nowPlaying = followed;
+    return true;
+  }
+
+  /** The friend's mpv counted the followed episode as watched: it counts here too. */
+  recordRemoteWatched(): void {
+    const current = this.nowPlaying;
+    if (current?.isRemote && !current.isWatched) void this.handleWatched(current.media.id, current.episode);
+  }
+
+  stopFollowingRemote(): void {
+    const current = this.nowPlaying;
+    if (!current?.isRemote) return;
+    this.sessions.delete(sessionKey(current.media.id, current.episode));
+    this.nowPlaying = null;
   }
 
   private async handleWatched(mediaId: number, episode: number): Promise<void> {

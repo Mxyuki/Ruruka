@@ -62,6 +62,14 @@ class MediaListStore {
     return request;
   }
 
+  /** Reloads the list when an episode it announces has aired since it was loaded. */
+  refreshIfAired(type: MediaType): Promise<void> {
+    if (!this.loadedTypes[type]) return Promise.resolve();
+    const nowSeconds = Date.now() / 1000;
+    const hasAired = this.list(type).some((entry) => (entry.media.nextAiringEpisode?.airingAt ?? Infinity) <= nowSeconds);
+    return hasAired ? this.load(type, true) : Promise.resolve();
+  }
+
   entryFor(mediaId: number): ListEntry | undefined {
     return this.entries.get(mediaId);
   }

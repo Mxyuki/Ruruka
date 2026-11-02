@@ -1,12 +1,13 @@
 <script lang="ts">
-  import type { SocialUser } from '../../api/queries/social';
-  import { userPath } from '../../lib/routes';
+  import type { SocialUser } from '../api/queries/social';
+  import { userPath } from '../lib/routes';
 
   interface Props {
     user: SocialUser;
     badge: string | null;
     isFollowing: boolean;
-    ontoggle: () => void;
+    /** Absent for the viewer themself, who can't follow themself. */
+    ontoggle?: () => void;
   }
 
   let { user, badge, isFollowing, ontoggle }: Props = $props();
@@ -18,9 +19,11 @@
     <a class="name" href="#{userPath(user.name)}">{user.name}</a>
     {#if badge}<span class="badge">{badge}</span>{/if}
   </div>
-  <button class="btn btn-sm" class:btn-primary={!isFollowing} class:btn-ghost={isFollowing} type="button" onclick={ontoggle}>
-    {isFollowing ? 'Ne plus suivre' : 'Suivre'}
-  </button>
+  {#if ontoggle}
+    <button class="btn btn-sm" class:btn-primary={!isFollowing} class:btn-ghost={isFollowing} type="button" onclick={ontoggle}>
+      {isFollowing ? 'Ne plus suivre' : 'Suivre'}
+    </button>
+  {/if}
 </div>
 
 <style>

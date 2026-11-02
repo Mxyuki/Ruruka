@@ -43,7 +43,9 @@ export const pluralize = (count: number, word: string) => `${count.toLocaleStrin
 const compactFormatter = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
 export const formatCompact = (value: number) => compactFormatter.format(value);
 
-export function formatCountdown(seconds: number): string {
+/** Time left until `airingAt` (Unix seconds), read from the clock at each call. */
+export function formatCountdown(airingAt: number): string {
+  const seconds = Math.max(0, airingAt - Math.floor(Date.now() / 1000));
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);

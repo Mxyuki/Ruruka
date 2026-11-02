@@ -80,6 +80,12 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
 - **Les listes des autres.** Depuis un profil, ouvre sa liste d'anime ou de manga, avec les
   mêmes onglets, filtres et tris que la tienne. Dans ta liste, les anime en diffusion passent
   en premier.
+- **Le dossier d'un ami.** Depuis son profil, ses onglets **Social** (qui il suit, qui le suit,
+  avec un filtre « en commun avec toi »), **Stats** (notes, années, genres, tags, studios,
+  seiyuu…) et **Critiques**.
+- **Séance entre amis.** Dans l'onglet « Séance », ouvre une séance et donne le code à tes
+  amis : pendant que tu partages mpv sur Discord, leur Ruruka suit l'épisode comme s'il tournait
+  chez eux (liste mise à jour, profil en direct). Rien à configurer, aucun port à ouvrir.
 - **Carnet de jour ou de nuit.** Thème clair, sombre, qui suit Windows, ou qui change selon
   l'heure (carnet de jour et carnet de nuit aux heures que tu choisis).
 - **Listes perso** : ajoute un anime à tes listes personnalisées depuis sa fiche, ou crées-en

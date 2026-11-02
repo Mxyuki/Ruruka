@@ -24,7 +24,7 @@
 
   const caption = $derived.by(() => {
     const playing = playback.nowPlaying;
-    if (playing) return `En lecture · ${playing.media.title.userPreferred} · ép. ${playing.episode}`;
+    if (playing) return `${playing.isRemote ? 'En séance' : 'En lecture'} · ${playing.media.title.userPreferred} · ép. ${playing.episode}`;
     return session.viewer ? `Le carnet d'enquête de ${session.viewer.name}` : 'Ruruka';
   });
 

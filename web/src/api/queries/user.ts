@@ -148,3 +148,68 @@ export async function saveCustomListNames(type: MediaType, names: string[]): Pro
   const { UpdateUser } = await gql<{ UpdateUser: { mediaListOptions: Viewer['mediaListOptions'] } }>(updateCustomListsMutations[type], { names });
   return type === 'ANIME' ? UpdateUser.mediaListOptions.animeList : UpdateUser.mediaListOptions.mangaList;
 }
+
+/** One row of a statistics breakdown: how many entries, and their mean score (100-point scale, 0 when unscored). */
+interface StatCount {
+  count: number;
+  meanScore: number;
+}
+
+export interface DetailedStatistics {
+  count: number;
+  meanScore: number;
+  standardDeviation: number;
+  minutesWatched?: number;
+  episodesWatched?: number;
+  chaptersRead?: number;
+  volumesRead?: number;
+  formats: { format: string; count: number }[];
+  statuses: { status: MediaListStatus; count: number }[];
+  scores: { score: number; count: number }[];
+  releaseYears: { releaseYear: number; count: number }[];
+  countries: { country: string; count: number }[];
+  genres: (StatCount & { genre: string })[];
+  tags: (StatCount & { tag: { id: number; name: string } })[];
+  studios?: (StatCount & { studio: { id: number; name: string } })[];
+  voiceActors?: (StatCount & { voiceActor: { id: number; name: { userPreferred: string } } })[];
+  staff: (StatCount & { staff: { id: number; name: { userPreferred: string } } })[];
+}
+
+const detailedStatisticsFields = `
+  count
+  meanScore
+  standardDeviation
+  formats(sort: COUNT_DESC) { format count }
+  statuses(sort: COUNT_DESC) { status count }
+  scores(sort: MEAN_SCORE) { score count }
+  releaseYears(sort: ID) { releaseYear count }
+  countries(sort: COUNT_DESC) { country count }
+  genres(limit: 12, sort: COUNT_DESC) { genre count meanScore }
+  tags(limit: 12, sort: COUNT_DESC) { tag { id name } count meanScore }
+  staff(limit: 10, sort: COUNT_DESC) { staff { id name { userPreferred } } count meanScore }
+`;
+
+const userStatisticsQuery = `
+  query ($name: String) {
+    User(name: $name) {
+      statistics {
+        anime {
+          ${detailedStatisticsFields}
+          minutesWatched
+          episodesWatched
+          studios(limit: 10, sort: COUNT_DESC) { studio { id name } count meanScore }
+          voiceActors(limit: 10, sort: COUNT_DESC) { voiceActor { id name { userPreferred } } count meanScore }
+        }
+        manga { ${detailedStatisticsFields} chaptersRead volumesRead }
+      }
+    }
+  }
+`;
+
+/** A user's full statistics for both media types (the stats tab). */
+export function fetchUserStatistics(name: string): Promise<Record<MediaType, DetailedStatistics>> {
+  return cached(`user:stats:${name}`, 10 * minuteMs, async () => {
+    const { User } = await gql<{ User: { statistics: { anime: DetailedStatistics; manga: DetailedStatistics } } }>(userStatisticsQuery, { name });
+    return { ANIME: User.statistics.anime, MANGA: User.statistics.manga };
+  });
+}

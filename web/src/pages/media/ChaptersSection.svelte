@@ -5,6 +5,7 @@
   import Icon from '../../components/Icon.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import Section from '../../components/Section.svelte';
+  import SiteIcon from '../../components/SiteIcon.svelte';
   import { mediaList } from '../../state/mediaList.svelte';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
@@ -72,7 +73,7 @@
   <Section title="Les chapitres">
     <div class="card chapters">
       <button class="disclosure" type="button" aria-expanded={isOpen} onclick={() => (isOpen = !isOpen)}>
-        {#if session.mangaSite}<img src="{session.mangaSite}/favicon.ico" alt="" width="20" height="20" />{/if}
+        {#if session.mangaSite}<SiteIcon site={session.mangaSite} size={20} />{/if}
         <span class="label">Lire les chapitres</span>
         <span class="chevron" class:is-open={isOpen}><Icon name="chevronDown" size={18} /></span>
       </button>

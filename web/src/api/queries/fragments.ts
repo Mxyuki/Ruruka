@@ -13,7 +13,7 @@ export const mediaSummaryFields = `
   averageScore
   season
   seasonYear
-  nextAiringEpisode { episode airingAt timeUntilAiring }
+  nextAiringEpisode { episode airingAt }
 `;
 
 /** Matches the `ListEntry` type. */

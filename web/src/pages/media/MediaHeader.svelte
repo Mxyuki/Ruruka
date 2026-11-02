@@ -107,7 +107,7 @@
         {/each}
         {#if media.nextAiringEpisode}
           <span class="airing" title="Prochain épisode">
-            ép. {media.nextAiringEpisode.episode} dans {formatCountdown(media.nextAiringEpisode.timeUntilAiring)}
+            ép. {media.nextAiringEpisode.episode} dans {formatCountdown(media.nextAiringEpisode.airingAt)}
           </span>
         {/if}
       </div>

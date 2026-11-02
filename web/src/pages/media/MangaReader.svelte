@@ -200,8 +200,15 @@
     {:else if pages[pageIndex]}
       {#if brokenPages.has(pageIndex)}
         <div class="broken">
-          <p>Cette page refuse de s’afficher, même depuis le serveur principal du site.</p>
-          <button class="btn btn-primary" type="button" onclick={() => retryPage(pageIndex)}><Icon name="refresh" size={14} /> Réessayer</button>
+          <p>Cette page refuse de s’afficher, même depuis le serveur principal du site. Le site limite parfois l’affichage de ses pages dans d’autres applis : sur son site, le chapitre reste lisible.</p>
+          <div class="broken-actions">
+            <button class="btn btn-primary" type="button" onclick={() => retryPage(pageIndex)}><Icon name="refresh" size={14} /> Réessayer</button>
+            {#if session.mangaSite}
+              <a class="btn btn-secondary" href="{session.mangaSite}/chapter/{chapter.id}" target="_blank" rel="noopener noreferrer">
+                <Icon name="external" size={14} /> Lire sur le site
+              </a>
+            {/if}
+          </div>
         </div>
       {:else}
         {#key sourceOf(pageIndex)}
@@ -377,5 +384,12 @@
     max-width: 420px;
     color: var(--onImage);
     text-align: center;
+  }
+
+  .broken-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space2);
   }
 </style>

@@ -36,7 +36,7 @@
             <Icon name="play" size={14} filled /> Épisode {nextEpisode}
           </button>
         {:else if isWaitingForAiring && airing}
-          <span class="sticker">Ép. {airing.episode} dans {formatCountdown(airing.timeUntilAiring)}</span>
+          <span class="sticker">Ép. {airing.episode} dans {formatCountdown(airing.airingAt)}</span>
         {:else if session.searchSite}
           <a
             class="btn btn-secondary"

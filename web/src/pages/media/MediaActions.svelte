@@ -5,6 +5,7 @@
   import ListEditor from '../../components/ListEditor.svelte';
   import NumberStepper from '../../components/NumberStepper.svelte';
   import SearchSiteButton from '../../components/SearchSiteButton.svelte';
+  import SiteIcon from '../../components/SiteIcon.svelte';
   import ScoreInput from '../../components/ScoreInput.svelte';
   import Sticker from '../../components/Sticker.svelte';
   import { formatListStatus, unitLabel, statusColor } from '../../lib/format';
@@ -96,7 +97,7 @@
     <!-- Avec un site de lecture dans les réglages, les manga se lisent dans Ruruka ; sinon, le site de recherche prend le relais -->
     {#if media.type === 'MANGA' && onread && session.mangaSite}
       <button class="chapters" type="button" title="Lire les chapitres sur {siteName(session.mangaSite)}" onclick={onread}>
-        <img src="{session.mangaSite}/favicon.ico" alt="" width="18" height="18" />
+        <SiteIcon site={session.mangaSite} size={18} />
         <span>Chapitres</span>
       </button>
     {:else}
@@ -157,7 +158,7 @@
     transform: rotate(-3deg) scale(1.05);
   }
 
-  .chapters img {
+  .chapters :global(img) {
     border-radius: 3px;
   }
 

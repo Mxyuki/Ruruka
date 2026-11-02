@@ -55,7 +55,7 @@
         <Icon name="play" size={12} filled /> Ép. {nextEpisode}
       </button>
     {:else if isWaitingForAiring && airing}
-      <span class="note">ép. {airing.episode} dans {formatCountdown(airing.timeUntilAiring)}</span>
+      <span class="note">ép. {airing.episode} dans {formatCountdown(airing.airingAt)}</span>
     {:else if session.searchSite}
       <a
         class="btn btn-secondary btn-sm"

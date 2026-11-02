@@ -30,7 +30,6 @@ export interface CoverImage {
 export interface AiringEpisode {
   episode: number;
   airingAt: number;
-  timeUntilAiring: number;
 }
 
 /** The fields every media card needs; queries spread `mediaSummaryFields` to get them. */

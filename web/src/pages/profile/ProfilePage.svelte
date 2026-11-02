@@ -9,7 +9,7 @@
   import Section from '../../components/Section.svelte';
   import { renderAniListMarkdown } from '../../lib/markdown';
   import type { RouteParams } from '../../lib/router.svelte';
-  import { aboutEditorPath, characterPath, staffPath, studioPath, userListPath } from '../../lib/routes';
+  import { aboutEditorPath, characterPath, staffPath, studioPath, userListPath, userSectionPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
 
@@ -60,6 +60,9 @@
       <div class="links">
         <a class="btn btn-sm" href="#{userListPath(user.name, 'ANIME')}"><Icon name="tv" size={14} /> Liste d’anime</a>
         <a class="btn btn-sm" href="#{userListPath(user.name, 'MANGA')}"><Icon name="book" size={14} /> Liste de manga</a>
+        <a class="btn btn-sm" href="#{userSectionPath(user.name, 'social')}"><Icon name="users" size={14} /> Social</a>
+        <a class="btn btn-sm" href="#{userSectionPath(user.name, 'stats')}"><Icon name="grid" size={14} /> Stats</a>
+        <a class="btn btn-sm" href="#{userSectionPath(user.name, 'reviews')}"><Icon name="edit" size={14} /> Critiques</a>
         <a class="btn btn-sm" href="https://anilist.co/user/{user.name}" target="_blank" rel="noopener noreferrer">Voir sur AniList</a>
       </div>
     </div>
