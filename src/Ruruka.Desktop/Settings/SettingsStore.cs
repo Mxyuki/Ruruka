@@ -33,6 +33,7 @@ public sealed class SettingsStore
         IsPlayerKeptOpen = patch.IsPlayerKeptOpen ?? settings.IsPlayerKeptOpen,
         EpisodeCompletionPercent = patch.EpisodeCompletionPercent ?? settings.EpisodeCompletionPercent,
         MinimumWatchedPercent = patch.MinimumWatchedPercent ?? settings.MinimumWatchedPercent,
+        CompareCacheMinutes = patch.CompareCacheMinutes ?? settings.CompareCacheMinutes,
         AboutTemplate = patch.AboutTemplate ?? settings.AboutTemplate,
         MediaSectionOrder = patch.MediaSectionOrder ?? settings.MediaSectionOrder,
         MangaLanguage = patch.MangaLanguage ?? settings.MangaLanguage,

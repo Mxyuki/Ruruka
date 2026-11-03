@@ -12,6 +12,7 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
 
     // mpv rarely reports the very last frame, so 100 % would never be reached.
     private const int MaxWatchPercent = 95;
+    private const int MaxCompareCacheMinutes = 120;
 
     public void Register(BridgeRouter router)
     {
@@ -53,6 +54,10 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
         if (patch.MinimumWatchedPercent is < 10 or > MaxWatchPercent)
         {
             throw new BridgeException($"Le temps vu minimum doit être entre 10 % et {MaxWatchPercent} %.");
+        }
+        if (patch.CompareCacheMinutes is < 0 or > MaxCompareCacheMinutes)
+        {
+            throw new BridgeException($"La mémoire des comparaisons va de 0 à {MaxCompareCacheMinutes} minutes.");
         }
         if (patch.MediaSectionOrder is { } order && (order.Count > MaxSectionCount || order.Any(id => !SectionId().IsMatch(id))))
         {

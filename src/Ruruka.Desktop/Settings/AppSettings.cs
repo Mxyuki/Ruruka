@@ -34,6 +34,9 @@ public sealed record AppSettings
     /// <summary>The share of an episode (in %) that must really be played, so skipped parts stay allowed up to the rest.</summary>
     public int MinimumWatchedPercent { get; init; } = 50;
 
+    /// <summary>How long (in minutes) both lists of a comparison stay in memory; 0 reloads them on every visit.</summary>
+    public int CompareCacheMinutes { get; init; } = 10;
+
     /// <summary>The profile "about" with live tags, kept on this PC only; empty when the about is plain text.</summary>
     public string AboutTemplate { get; init; } = "";
 
@@ -74,6 +77,7 @@ public sealed record AppSettings
         IsPlayerKeptOpen,
         EpisodeCompletionPercent,
         MinimumWatchedPercent,
+        CompareCacheMinutes,
         AboutTemplate,
         MediaSectionOrder,
         MangaLanguage,
@@ -99,6 +103,7 @@ public sealed record PublicSettings(
     bool IsPlayerKeptOpen,
     int EpisodeCompletionPercent,
     int MinimumWatchedPercent,
+    int CompareCacheMinutes,
     string AboutTemplate,
     IReadOnlyList<string> MediaSectionOrder,
     string MangaLanguage,
@@ -123,6 +128,7 @@ public sealed record SettingsPatch
     public bool? IsPlayerKeptOpen { get; init; }
     public int? EpisodeCompletionPercent { get; init; }
     public int? MinimumWatchedPercent { get; init; }
+    public int? CompareCacheMinutes { get; init; }
 
     /// <summary>An empty string clears the template.</summary>
     public string? AboutTemplate { get; init; }

@@ -20,6 +20,8 @@ export interface Settings {
   episodeCompletionPercent: number;
   /** The share of an episode (in %) that must really be played; the rest may be skipped. */
   minimumWatchedPercent: number;
+  /** Minutes both lists of a comparison stay in memory; 0 reloads them on every visit. */
+  compareCacheMinutes: number;
   /** The about with live tags, kept on this PC only; empty when the about is plain text. */
   aboutTemplate: string;
   /** Media page section ids in the user's order; empty keeps the default order. */

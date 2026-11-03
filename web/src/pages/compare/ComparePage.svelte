@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { fetchComparisonList } from '../../api/queries/list';
+  import { fetchComparisonList, forgetComparisonLists } from '../../api/queries/list';
   import { fetchUserProfile } from '../../api/queries/user';
   import type { MediaType } from '../../api/types';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Icon from '../../components/Icon.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
+  import { formatRelativeTime } from '../../lib/format';
   import type { RouteParams } from '../../lib/router.svelte';
   import { userPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
@@ -22,21 +24,31 @@
     ['MANGA', 'Manga'],
   ];
 
-  // <-- Les deux listes complètes, genres et mots-clés compris, puis tout se calcule ici sans autre requête -->
-  const comparison = $derived(
-    Promise.all([
+  let reloadCount = $state(0);
+  const cacheMinutes = $derived(session.settings?.compareCacheMinutes ?? 10);
+
+  // <-- Les deux listes complètes, genres et mots-clés compris, gardées en mémoire le temps choisi dans les réglages ; tout se calcule ici sans autre requête -->
+  const comparison = $derived.by(() => {
+    void reloadCount;
+    return Promise.all([
       fetchUserProfile(name),
-      fetchComparisonList(session.viewer?.name ?? '', type, session.scoreFormat),
-      fetchComparisonList(name, type, session.scoreFormat),
+      fetchComparisonList(session.viewer?.name ?? '', type, session.scoreFormat, cacheMinutes),
+      fetchComparisonList(name, type, session.scoreFormat, cacheMinutes),
     ]).then(([user, mine, theirs]) => ({
       user,
-      mine,
-      theirs,
-      affinity: affinityOf(mine, theirs),
-      myTastes: tasteProfile(mine),
-      theirTastes: tasteProfile(theirs),
-    })),
-  );
+      mine: mine.entries,
+      theirs: theirs.entries,
+      loadedAt: Math.min(mine.loadedAt, theirs.loadedAt),
+      affinity: affinityOf(mine.entries, theirs.entries),
+      myTastes: tasteProfile(mine.entries),
+      theirTastes: tasteProfile(theirs.entries),
+    }));
+  });
+
+  function reload() {
+    forgetComparisonLists();
+    reloadCount++;
+  }
 </script>
 
 <div class="page">
@@ -48,6 +60,9 @@
             {label}
           </button>
         {/each}
+        <button class="btn btn-sm" type="button" title="Redemander les deux listes à AniList, même si elles sont encore en mémoire" onclick={reload}>
+          <Icon name="refresh" size={14} /> Relever à nouveau
+        </button>
         <a class="btn btn-sm btn-ghost" href="#{userPath(name)}">Retour au profil</a>
       </div>
     {/snippet}
@@ -55,7 +70,8 @@
 
   {#await comparison}
     <LoadingState />
-  {:then { user, mine, theirs, affinity, myTastes, theirTastes }}
+  {:then { user, mine, theirs, loadedAt, affinity, myTastes, theirTastes }}
+    <p class="freshness faint">Carnets relevés {formatRelativeTime(loadedAt / 1000)}</p>
     {#if session.viewer}
       <AffinityCard viewer={session.viewer} other={user} {affinity} {type} />
     {/if}
@@ -67,6 +83,12 @@
 </div>
 
 <style>
+  .freshness {
+    margin: calc(var(--space4) * -1) 0 var(--space4);
+    font-size: var(--fontSizeSm);
+    text-align: right;
+  }
+
   .types {
     display: flex;
     flex-wrap: wrap;

@@ -1,4 +1,4 @@
-import { cached, minuteMs } from '../cache';
+import { cached, invalidate, minuteMs } from '../cache';
 import { gql } from '../client';
 import type { ListEntry, ListEntryChanges, MediaListStatus, MediaSummary, MediaType, PublicListEntry, ScoreFormat } from '../types';
 import { listEntryFields, mediaSummaryFields } from './fragments';
@@ -88,16 +88,32 @@ const comparisonListQuery = `
   }
 `;
 
-/** A user's whole list with genres and tags, to compare two detectives' tastes. */
-export function fetchComparisonList(userName: string, type: MediaType, scoreFormat: ScoreFormat): Promise<ComparisonEntry[]> {
-  return cached(`compareList:${userName.toLowerCase()}:${type}:${scoreFormat}`, 5 * minuteMs, async () => {
+export interface ComparisonList {
+  entries: ComparisonEntry[];
+  /** Unix milliseconds, so the page can say how old a kept list is. */
+  loadedAt: number;
+}
+
+const comparisonCacheKey = 'compareList:';
+
+/**
+ * A user's whole list with genres and tags, to compare two detectives' tastes. It stays in memory for
+ * `cacheMinutes` (a big list weighs ~2 MB from AniList); 0 always asks AniList again.
+ */
+export function fetchComparisonList(userName: string, type: MediaType, scoreFormat: ScoreFormat, cacheMinutes: number): Promise<ComparisonList> {
+  const load = async () => {
     const { MediaListCollection } = await gql<{ MediaListCollection: { lists: { entries: ComparisonEntry[] }[] } }>(
       comparisonListQuery,
       { userName, type, scoreFormat },
     );
-    return uniqueEntries(MediaListCollection.lists);
-  });
+    return { entries: uniqueEntries(MediaListCollection.lists), loadedAt: Date.now() };
+  };
+  if (cacheMinutes <= 0) return load();
+  return cached(`${comparisonCacheKey}${userName.toLowerCase()}:${type}:${scoreFormat}`, cacheMinutes * minuteMs, load);
 }
+
+/** Drops every kept comparison list, so the next comparison asks AniList again. */
+export const forgetComparisonLists = () => invalidate(comparisonCacheKey);
 
 const saveEntryMutation = `
   mutation (

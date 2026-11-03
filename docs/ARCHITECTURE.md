@@ -287,7 +287,8 @@ and appear on the Library page for manual linking.
 
 **Comparing two lists.** `/user/:name/compare` (« Comparer nos carnets » on someone else's profile) loads both
 whole lists once with genres and tags (`fetchComparisonList`, scores both in POINT_100 for the maths and in the
-viewer's format for display) and computes everything client-side in `pages/compare/`. The affinity is the Pearson
+viewer's format for display) and computes everything client-side in `pages/compare/`. Both lists stay in the in-memory cache for `AppSettings.CompareCacheMinutes` (10 by default,
+0 = no cache, Settings → Comparer nos carnets); « Relever à nouveau » drops them (`forgetComparisonLists`) and reloads. The affinity is the Pearson
 correlation of both scores on titles both have seen and scored (at least 5), like the usual AniList affinity tools.
 A taste profile (`tastes.ts`) weighs each genre and strong tag (rank ≥ 80, no spoilers; tag filters use the same bar) by how far its mean score
 sits above the user's own mean, plus a bonus for how often it comes up; shared tastes are the ones both weigh

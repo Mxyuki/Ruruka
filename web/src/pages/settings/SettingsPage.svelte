@@ -24,6 +24,13 @@
 
   const completionOptions = [70, 75, 80, 85, 90, 95];
   const minimumWatchedOptions = [30, 40, 50, 60, 70];
+  const compareCacheOptions: [number, string][] = [
+    [0, 'Désactivée'],
+    [5, '5 min'],
+    [10, '10 min'],
+    [30, '30 min'],
+    [60, '1 h'],
+  ];
   let isSectionOrderOpen = $state(false);
   const hasCustomOrder = $derived(Boolean(session.settings?.mediaSectionOrder.length));
 
@@ -129,6 +136,21 @@
       <p class="hint">Choisis dans quel ordre s’affichent le résumé, les épisodes, le fil des indices, la bande-son…</p>
       <button class="btn" type="button" onclick={() => (isSectionOrderOpen = true)}>Configurer l’ordre des sections</button>
       {#if hasCustomOrder}<span class="faint custom-order">Ordre personnalisé</span>{/if}
+    </section>
+
+    <!-- Combien de temps une comparaison garde les deux listes -->
+    <section class="card" style:--accent="var(--colorMauve)">
+      <h2 class="note-label">Comparer nos carnets</h2>
+      <p class="hint">
+        Les deux listes restent en mémoire ce temps-là : revenir sur une comparaison ne les redemande pas à AniList. Le bouton « Relever à nouveau » force la mise à jour.
+      </p>
+      <div class="themes">
+        {#each compareCacheOptions as [minutes, label] (minutes)}
+          <button class="chip" class:is-active={session.settings?.compareCacheMinutes === minutes} type="button" onclick={() => update({ compareCacheMinutes: minutes })}>
+            {label}
+          </button>
+        {/each}
+      </div>
     </section>
 
     <SitesCard {update} />
