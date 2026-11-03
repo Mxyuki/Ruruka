@@ -1,8 +1,8 @@
 import type { ComparisonEntry } from '../../api/queries/list';
-import type { ScoreFormat } from '../../api/types';
+import type { MediaFormat, ScoreFormat } from '../../api/types';
 import { excludedNames, requiredNames, type FilterPick } from '../../lib/filterPicks';
 import { formatUserScore, scoreScales } from '../../lib/format';
-import { indexByMedia, isSeen, tasteMatch, type TasteProfile } from './tastes';
+import { indexByMedia, isSeen, strongTagRank, tasteMatch, type TasteProfile } from './tastes';
 
 export type LeadSort = 'match' | 'score' | 'popularity' | 'harmony';
 
@@ -16,6 +16,11 @@ export interface LeadFilters {
   minScore: number;
   /** Keeps titles the other user only plans to watch. */
   includesPlanned: boolean;
+  /** Empty keeps every format. */
+  formats: MediaFormat[];
+  /** Episode (or chapter) count bounds; null for no bound. */
+  minUnits: number | null;
+  maxUnits: number | null;
   sort: LeadSort;
 }
 
@@ -30,8 +35,18 @@ export interface Lead {
   harmony: number;
 }
 
+// <-- Un titre dont on ne connaît pas encore le nombre d'épisodes (en diffusion) sort dès qu'une borne est posée -->
+function hasLength(media: ComparisonEntry['media'], filters: LeadFilters): boolean {
+  if (!filters.minUnits && !filters.maxUnits) return true;
+  const units = media.type === 'MANGA' ? media.chapters : media.episodes;
+  if (!units) return false;
+  return units >= (filters.minUnits || 0) && units <= (filters.maxUnits || Infinity);
+}
+
 function hasPicks(media: ComparisonEntry['media'], filters: LeadFilters): boolean {
-  const tagNames = new Set(media.tags.map((tag) => tag.name));
+  const tagNames = new Set(media.tags.filter((tag) => tag.rank >= strongTagRank).map((tag) => tag.name));
+  if (filters.formats.length && !(media.format && filters.formats.includes(media.format))) return false;
+  if (!hasLength(media, filters)) return false;
   return (
     requiredNames(filters.genres).every((genre) => media.genres.includes(genre)) &&
     !excludedNames(filters.genres).some((genre) => media.genres.includes(genre)) &&

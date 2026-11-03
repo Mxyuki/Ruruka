@@ -289,10 +289,10 @@ and appear on the Library page for manual linking.
 whole lists once with genres and tags (`fetchComparisonList`, scores both in POINT_100 for the maths and in the
 viewer's format for display) and computes everything client-side in `pages/compare/`. The affinity is the Pearson
 correlation of both scores on titles both have seen and scored (at least 5), like the usual AniList affinity tools.
-A taste profile (`tastes.ts`) weighs each genre and strong tag (rank ≥ 60, no spoilers) by how far its mean score
+A taste profile (`tastes.ts`) weighs each genre and strong tag (rank ≥ 80, no spoilers; tag filters use the same bar) by how far its mean score
 sits above the user's own mean, plus a bonus for how often it comes up; shared tastes are the ones both weigh
 positively. The leads (`leads.ts`) are one user's seen, non-dropped titles the other hasn't seen (their « À voir »
-can be kept), filtered by required / excluded genres and tags and a minimum score, and sorted by how well they fit
+can be kept), filtered by required / excluded genres and tags, formats, an episode (or chapter) range and a minimum score, and sorted by how well they fit
 the receiver's profile. « Nos coups de cœur communs » lists titles both saw, ranked by the lower of the two scores
 (then their sum): 10 + 2 ranks below 5 + 5, so only what both loved comes first.
 

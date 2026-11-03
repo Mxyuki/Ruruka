@@ -23,7 +23,7 @@
   const pageSize = 48;
   let mode = $state<LeadMode>('mine');
   let shownCount = $state(pageSize);
-  let filters = $state<LeadFilters>({ genres: [], tags: [], minScore: defaultMinScore(session.scoreFormat), includesPlanned: true, sort: 'match' });
+  let filters = $state<LeadFilters>({ genres: [], tags: [], minScore: defaultMinScore(session.scoreFormat), includesPlanned: true, sort: 'match', formats: [], minUnits: null, maxUnits: null });
 
   const modes = $derived<[LeadMode, string][]>([
     ['mine', `Mes coups de cœur que ${otherName} n’a pas vus`],
@@ -68,7 +68,7 @@
     {/each}
   </div>
 
-  <LeadFilterBar bind:filters {genres} {mode} {otherName} />
+  <LeadFilterBar bind:filters {genres} {mode} {otherName} {type} />
 
   {#if leads.length}
     <p class="faint count">{leads.length} {word} {mode === 'shared' ? 'aimés par vous deux' : 'à proposer'}</p>

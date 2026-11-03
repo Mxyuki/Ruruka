@@ -59,8 +59,8 @@ interface Feature {
 
 export type TasteProfile = Map<string, Feature>;
 
-/** A tag counts toward tastes only when most voters agree it fits the media. */
-const strongTagRank = 60;
+/** A tag counts (for tastes and filters) only when nearly every voter agrees it fits the media. */
+export const strongTagRank = 80;
 const frequencyBonus = 30;
 
 export const featureKey = (kind: TasteKind, name: string) => `${kind}:${name}`;
