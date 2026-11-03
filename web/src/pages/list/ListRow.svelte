@@ -41,7 +41,7 @@
   <a href="#{mediaPath(media.id)}" class="cover"><img src={media.coverImage.medium} alt="" loading="lazy" width="40" height="56" /></a>
   <a href="#{mediaPath(media.id)}" class="title">{media.title.userPreferred}</a>
   <span class="format">{formatEnum(media.format)}</span>
-  <span class="score">{formatUserScore(entry.score, session.viewer?.mediaListOptions.scoreFormat ?? 'POINT_100')}</span>
+  <span class="score">{formatUserScore(entry.score, session.scoreFormat)}</span>
   <span class="progress">
     {entry.progress}{total ? ` / ${total}` : ''}
     {#if isEditable && (!total || entry.progress < total)}

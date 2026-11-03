@@ -48,7 +48,9 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
   restent cachés.
 - **L'épisode tout juste sorti à la une.** Un nouvel épisode annoncé par AniList dans les 12
   dernières heures prend la place de l'affaire du jour.
-- **Social** : l'activité de tes amis, les « j'aime », les réponses, et qui te suit en retour.
+- **Social** : l'activité de tes amis, les « j'aime » (survole le cœur pour voir qui a aimé), les
+  réponses, la note à côté de chaque anime terminé, et qui te suit en retour. Modifie ou supprime
+  tes propres messages avec « ⋯ », et cherche n'importe qui sur AniList depuis la page Amis.
 - **Ta présentation, comme sur AniList.** Spoilers à cliquer, vidéos YouTube intégrées, blocs
   centrés : les profils s'affichent comme sur le site. Le bouton « Modifier » ouvre un éditeur
   avec aperçu en direct et un guide de toutes les balises.
@@ -83,6 +85,12 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
 - **Le dossier d'un ami.** Depuis son profil, ses onglets **Social** (qui il suit, qui le suit,
   avec un filtre « en commun avec toi »), **Stats** (notes, années, genres, tags, studios,
   seiyuu…) et **Critiques**.
+- **Comparer vos carnets.** Sur le profil d'un ami, « Comparer nos carnets » donne votre affinité,
+  les genres et mots-clés que vous aimez tous les deux, tes coups de cœur à lui faire découvrir
+  (et inversement) avec des filtres genres / mots-clés / note, et les anime que vous avez adorés
+  tous les deux.
+- **Partager une fiche.** Sur la page d'un anime, le bouton de partage dessine une jolie carte
+  (jaquette, progression, ta note) à copier ou enregistrer en image.
 - **Séance entre amis.** Dans l'onglet « Séance », ouvre une séance et donne le code à tes
   amis : pendant que tu partages mpv sur Discord, leur Ruruka suit l'épisode comme s'il tournait
   chez eux (liste mise à jour, profil en direct). Rien à configurer, aucun port à ouvrir.

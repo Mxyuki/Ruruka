@@ -21,6 +21,7 @@ export const routes: RouteDefinition[] = [
   { pattern: '/user/:name/social', load: page(() => import('../pages/profile/UserSocialPage.svelte')) },
   { pattern: '/user/:name/stats', load: page(() => import('../pages/profile/UserStatsPage.svelte')) },
   { pattern: '/user/:name/reviews', load: page(() => import('../pages/profile/UserReviewsPage.svelte')) },
+  { pattern: '/user/:name/compare', load: page(() => import('../pages/compare/ComparePage.svelte')) },
   { pattern: '/user/:name/list/:type', load: page(() => import('../pages/list/ListPage.svelte')) },
   { pattern: '/about/edit', load: page(() => import('../pages/profile/AboutEditorPage.svelte')) },
   { pattern: '/group-watch', load: page(() => import('../pages/groupWatch/GroupWatchPage.svelte')) },
@@ -33,7 +34,7 @@ export const characterPath = (id: number) => `/character/${id}`;
 export const staffPath = (id: number) => `/staff/${id}`;
 export const studioPath = (id: number) => `/studio/${id}`;
 export const userPath = (name: string) => `/user/${encodeURIComponent(name)}`;
-type ProfileSection = 'social' | 'stats' | 'reviews';
+type ProfileSection = 'social' | 'stats' | 'reviews' | 'compare';
 export const userSectionPath = (name: string, section: ProfileSection) => `${userPath(name)}/${section}`;
 export const userListPath = (name: string, type: MediaType) => `${userPath(name)}/list/${type === 'MANGA' ? 'manga' : 'anime'}`;
 export const aboutEditorPath = '/about/edit';

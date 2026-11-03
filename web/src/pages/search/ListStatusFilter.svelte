@@ -1,7 +1,7 @@
 <script lang="ts">
   import { listStatuses, type MediaType } from '../../api/types';
   import { formatListStatus, statusColor } from '../../lib/format';
-  import type { ListChoice } from './filterPicks';
+  import type { ListChoice } from '../../lib/filterPicks';
 
   interface Props {
     type: MediaType;

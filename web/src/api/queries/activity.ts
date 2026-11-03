@@ -1,5 +1,5 @@
 import { gql } from '../client';
-import type { MediaTitle, MediaType, PageInfo } from '../types';
+import type { MediaTitle, MediaType, PageInfo, ScoreFormat } from '../types';
 
 export interface ActivityUser {
   id: number;
@@ -10,6 +10,7 @@ export interface ActivityUser {
 interface Social {
   likeCount: number;
   isLiked: boolean;
+  likes: ActivityUser[];
 }
 
 export type Activity = Social & { replyCount: number } & (
@@ -23,6 +24,8 @@ export type Activity = Social & { replyCount: number } & (
       /** A single number or a range such as "4 - 6"; null when the status has no progress. */
       progress: string | null;
       media: { id: number; type: MediaType; title: MediaTitle; coverImage: { medium: string; large: string } };
+      /** For a completed or dropped media: the user's current score, in the viewer's format; null when unscored. */
+      score: number | null;
     }
   | { kind: 'text'; id: number; createdAt: number; user: ActivityUser; text: string }
 );
@@ -40,8 +43,9 @@ export interface ActivityPage {
 }
 
 const userSelection = 'user { id name avatar { medium } }';
-const socialFields = 'likeCount isLiked replyCount';
-const replyFields = `id createdAt text(asHtml: true) likeCount isLiked ${userSelection}`;
+const likeFields = `likeCount isLiked likes { id name avatar { medium } }`;
+const socialFields = `${likeFields} replyCount`;
+const replyFields = `id createdAt text(asHtml: true) ${likeFields} ${userSelection}`;
 
 /** `filter` is spliced into `activities(…)`, e.g. "isFollowing: true" or "userId: $userId". */
 const activityQuery = (variables: string, filter: string) => `
@@ -63,32 +67,81 @@ const activityQuery = (variables: string, filter: string) => `
 const followingActivityQuery = activityQuery('', 'isFollowing: true');
 const userActivityQuery = activityQuery(', $userId: Int', 'userId: $userId');
 
-type ListFields = Omit<Extract<Activity, { kind: 'list' }>, 'kind'>;
+type ListFields = Omit<Extract<Activity, { kind: 'list' }>, 'kind' | 'score'>;
 type TextFields = Omit<Extract<Activity, { kind: 'text' }>, 'kind'>;
-type RawActivity = ({ __typename: 'ListActivity' } & ListFields) | ({ __typename: 'TextActivity' } & TextFields);
+type RawListActivity = { __typename: 'ListActivity' } & ListFields;
+type RawActivity = RawListActivity | ({ __typename: 'TextActivity' } & TextFields);
 
-function normalize(raw: RawActivity): Activity {
+const scoreKey = (userId: number, mediaId: number) => `${userId}:${mediaId}`;
+
+// <-- La note n'a de sens qu'en fin de parcours : une série terminée, revue ou abandonnée, jamais un épisode en cours -->
+const scoredStatuses = new Set(['completed', 'rewatched', 'reread', 'dropped']);
+const isScoredActivity = (raw: RawActivity): raw is RawListActivity => raw.__typename === 'ListActivity' && scoredStatuses.has(raw.status.toLowerCase());
+
+function normalize(raw: RawActivity, scores: Map<string, number>): Activity {
   if (raw.__typename === 'ListActivity') {
     const { __typename, ...activity } = raw;
-    return { kind: 'list', ...activity };
+    const score = isScoredActivity(raw) ? scores.get(scoreKey(raw.user.id, raw.media.id)) : undefined;
+    return { kind: 'list', ...activity, score: score || null };
   }
   const { __typename, ...activity } = raw;
   return { kind: 'text', ...activity };
 }
 
-async function fetchActivities(query: string, variables: Record<string, unknown>, keep: (raw: RawActivity) => boolean): Promise<ActivityPage> {
+const maxScorePages = 3;
+
+// <-- AniList croise chaque utilisateur avec chaque média demandé : seules les paires des activités sont gardées -->
+const completedScoresQuery = `
+  query ($page: Int, $userIds: [Int], $mediaIds: [Int], $scoreFormat: ScoreFormat) {
+    Page(page: $page, perPage: 50) {
+      pageInfo { hasNextPage }
+      mediaList(userId_in: $userIds, mediaId_in: $mediaIds) { userId mediaId score(format: $scoreFormat) }
+    }
+  }
+`;
+
+/** Current scores of the users who completed or dropped a media in these activities, keyed by `scoreKey`. */
+async function fetchCompletedScores(activities: RawActivity[], scoreFormat: ScoreFormat): Promise<Map<string, number>> {
+  const completions = activities.filter(isScoredActivity);
+  const scores = new Map<string, number>();
+  if (!completions.length) return scores;
+
+  const wanted = new Set(completions.map((raw) => scoreKey(raw.user.id, raw.media.id)));
+  const userIds = [...new Set(completions.map((raw) => raw.user.id))];
+  const mediaIds = [...new Set(completions.map((raw) => raw.media.id))];
+  for (let page = 1; page <= maxScorePages; page++) {
+    const { Page } = await gql<{ Page: { pageInfo: { hasNextPage: boolean }; mediaList: { userId: number; mediaId: number; score: number }[] } }>(
+      completedScoresQuery,
+      { page, userIds, mediaIds, scoreFormat },
+    );
+    for (const entry of Page.mediaList) {
+      const key = scoreKey(entry.userId, entry.mediaId);
+      if (wanted.has(key)) scores.set(key, entry.score);
+    }
+    if (!Page.pageInfo.hasNextPage) break;
+  }
+  return scores;
+}
+
+async function fetchActivities(
+  query: string,
+  variables: Record<string, unknown>,
+  scoreFormat: ScoreFormat,
+  keep: (raw: RawActivity) => boolean,
+): Promise<ActivityPage> {
   const { Page } = await gql<{ Page: { pageInfo: PageInfo; activities: (RawActivity | null)[] } }>(query, variables);
-  const activities = Page.activities.filter((raw): raw is RawActivity => raw?.id != null && keep(raw)).map(normalize);
-  return { pageInfo: Page.pageInfo, activities };
+  const kept = Page.activities.filter((raw): raw is RawActivity => raw?.id != null && keep(raw));
+  const scores = await fetchCompletedScores(kept, scoreFormat);
+  return { pageInfo: Page.pageInfo, activities: kept.map((raw) => normalize(raw, scores)) };
 }
 
 /** Activity from followed users, newest first. AniList's following feed includes the viewer, so they are filtered out. */
-export function fetchFriendActivity(viewerId: number, page = 1): Promise<ActivityPage> {
-  return fetchActivities(followingActivityQuery, { page }, (raw) => raw.user.id !== viewerId);
+export function fetchFriendActivity(viewerId: number, scoreFormat: ScoreFormat, page = 1): Promise<ActivityPage> {
+  return fetchActivities(followingActivityQuery, { page }, scoreFormat, (raw) => raw.user.id !== viewerId);
 }
 
-export function fetchUserActivity(userId: number, page = 1): Promise<ActivityPage> {
-  return fetchActivities(userActivityQuery, { page, userId }, () => true);
+export function fetchUserActivity(userId: number, scoreFormat: ScoreFormat, page = 1): Promise<ActivityPage> {
+  return fetchActivities(userActivityQuery, { page, userId }, scoreFormat, () => true);
 }
 
 const repliesQuery = `
@@ -120,7 +173,38 @@ export async function postStatus(text: string): Promise<Activity> {
   return { kind: 'text', ...SaveTextActivity };
 }
 
+const statusMarkdownQuery = `
+  query ($id: Int) { Activity(id: $id) { ... on TextActivity { text } } }
+`;
+
+/** A status as typed (markdown), for editing: the feed only holds AniList's HTML. */
+export async function fetchStatusMarkdown(id: number): Promise<string> {
+  const { Activity } = await gql<{ Activity: { text?: string } }>(statusMarkdownQuery, { id });
+  return Activity.text ?? '';
+}
+
+const editStatusMutation = `
+  mutation ($id: Int, $text: String) { SaveTextActivity(id: $id, text: $text) { text(asHtml: true) } }
+`;
+
+/** Replaces a status's text; returns the new HTML. */
+export async function editStatus(id: number, text: string): Promise<string> {
+  const { SaveTextActivity } = await gql<{ SaveTextActivity: { text: string } }>(editStatusMutation, { id, text });
+  return SaveTextActivity.text;
+}
+
+const deleteActivityMutation = `
+  mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }
+`;
+
+export async function deleteActivity(id: number): Promise<void> {
+  await gql(deleteActivityMutation, { id });
+}
+
 export type LikeTarget = 'ACTIVITY' | 'ACTIVITY_REPLY';
+
+/** An activity or a reply: anything with a heart. */
+export type Likeable = Social & { id: number };
 
 const toggleLikeMutation = `
   mutation ($id: Int, $type: LikeableType) {
@@ -132,8 +216,10 @@ const toggleLikeMutation = `
   }
 `;
 
-/** Likes or unlikes, returning AniList's resulting state. */
-export async function toggleLike(id: number, type: LikeTarget): Promise<Social> {
-  const { ToggleLikeV2 } = await gql<{ ToggleLikeV2: Social }>(toggleLikeMutation, { id, type });
+type LikeState = Pick<Social, 'likeCount' | 'isLiked'>;
+
+/** Likes or unlikes, returning AniList's resulting state (the list of likers is kept by the caller). */
+export async function toggleLike(id: number, type: LikeTarget): Promise<LikeState> {
+  const { ToggleLikeV2 } = await gql<{ ToggleLikeV2: LikeState }>(toggleLikeMutation, { id, type });
   return ToggleLikeV2;
 }

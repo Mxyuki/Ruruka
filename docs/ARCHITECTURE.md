@@ -81,7 +81,7 @@ Directory.Build.targets      drops the WPF assembly the WebView2 package always 
 web/src/
   main.ts, App.svelte        bootstrap, shell layout, router outlet
   styles/                    tokens.css (theme), base.css (reset + primitives)
-  lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, searchSite, titleMatch, watchCode
+  lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, searchSite, titleMatch, watchCode, filterPicks
   api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts, anisongdb.ts (anime songs, not AniList), mangaSite.ts, watchRelay.ts (group watch relay)
     queries/                 GraphQL documents + typed fetchers, one file per domain
   state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, groupWatch, updates, toasts
@@ -118,6 +118,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `shell.openUrl` | Open an http(s) link in the default browser |
 | `shell.openPath` | Open a folder in Explorer or a video in its default app (nothing else, by design) |
 | `shell.pickFolder` / `shell.pickFile` | Native dialogs |
+| `shell.saveImage` | Save dialog for a PNG drawn by the UI (share cards). The host checks the PNG signature and a 20 MB cap. A `download` link would be a navigation, which the window sends to the browser |
 | `update.check` | Latest GitHub release if newer than this build and it ships a `Ruruka-Setup-*.exe`, else null |
 | `manga.get` | Read-only call to the manga site API (`/manga…`, `/manga/{id}/feed`, `/at-home/server/{id}`). That API sends no CORS headers, so the host fetches it |
 | `update.install` | Download that installer, quit, then run it silently once the instance mutex is released |
@@ -249,7 +250,7 @@ most advanced ready-to-play anime. The hero is left out of the lists below, so t
 **Other users' lists.** `/user/:name/list/:type` reuses `ListPage` read-only (no +1, play or
 editor). `fetchUserList` asks AniList for scores already in the viewer's format.
 
-**Explorer filters.** Genres and tags are picked several at a time (`pages/search/filterPicks.ts`);
+**Explorer filters.** Genres and tags are picked several at a time (`lib/filterPicks.ts`, shared with the comparison page);
 each pick is required or excluded (`genre_in` / `genre_not_in`, `tag_in` / `tag_not_in`, all
 ANDed by AniList). AniList takes one `minimumTagRank` for every tag, so `browseMedia` sends the
 lowest chosen percentage and checks stricter tags on the returned `tags { rank }`, reading up to
@@ -283,6 +284,33 @@ as 0.9.
 Links are saved as `auto` or `manual`, and manual links are never overwritten. A manual link
 with no media means "ignored". Folders without a confident match are saved as `unmatched`
 and appear on the Library page for manual linking.
+
+**Comparing two lists.** `/user/:name/compare` (« Comparer nos carnets » on someone else's profile) loads both
+whole lists once with genres and tags (`fetchComparisonList`, scores both in POINT_100 for the maths and in the
+viewer's format for display) and computes everything client-side in `pages/compare/`. The affinity is the Pearson
+correlation of both scores on titles both have seen and scored (at least 5), like the usual AniList affinity tools.
+A taste profile (`tastes.ts`) weighs each genre and strong tag (rank ≥ 60, no spoilers) by how far its mean score
+sits above the user's own mean, plus a bonus for how often it comes up; shared tastes are the ones both weigh
+positively. The leads (`leads.ts`) are one user's seen, non-dropped titles the other hasn't seen (their « À voir »
+can be kept), filtered by required / excluded genres and tags and a minimum score, and sorted by how well they fit
+the receiver's profile. « Nos coups de cœur communs » lists titles both saw, ranked by the lower of the two scores
+(then their sum): 10 + 2 ranks below 5 + 5, so only what both loved comes first.
+
+**Share card.** The « Partager » button of the media page draws a 1200×576 card (×1.5 pixels) on a canvas
+(`pages/media/shareCard.ts`) from the current theme's tokens, the cover, the banner, the progress and the
+viewer's score. AniList's image CDN answers CORS, but without an `Origin` it answers with no `Vary` and a month of
+cache, so the copy the page already shows would be reused without CORS and taint the canvas: the card asks for
+the images with an extra query parameter to get a separate, CORS-enabled copy.
+The card is copied to the clipboard (`ClipboardItem`) or saved through `shell.saveImage`.
+
+**Scores in the feed.** AniList's list activities don't carry a score. For each feed page, `fetchActivities`
+asks `Page.mediaList(userId_in, mediaId_in)` for the pairs of completed, rewatched or dropped activities (never episode progress) (AniList returns every user × media
+combination, so only the activities' own pairs are kept, up to 3 pages of 50) and shows the user's current score
+next to the title. The feed query also brings `likes` so hovering a heart lists who liked, with no request per hover.
+
+**Even grids.** Profile favourites (25 per kind, like anilist.co) use `pages/profile/FavouriteGrid.svelte`: as many
+columns as fit, then equal rows (25 → 9 + 9 + 7), the short row centered. The media page's characters show as many
+full rows as fit around 12 (12 on 4 columns, 15 on 5), and balance the rows when expanded.
 
 ## Where does my change go? (recipes)
 
@@ -321,11 +349,14 @@ and appear on the Library page for manual linking.
 | Anime songs (openings, endings, inserts) from AnisongDB with audio / HQ / MQ players | ✅ |
 | Manga chapters from the manga site chosen in Settings, in a chosen language, in-app reader that updates chapter / volume progress | ✅ |
 | Media page section order (Settings) | ✅ |
-| Social: following feed, following / followers with mutual badges, follow / unfollow | ✅ |
+| Social: following feed, following / followers with mutual badges, follow / unfollow, user search with suggestions (`users(search)`, 300 ms after typing stops) | ✅ |
 | Activity likes, replies (read, write, like), posting a status | ✅ |
 | Local library + mpv playback + auto-sync | ✅ |
 | Group watch: a code shared with friends; their list and live about follow the host's mpv | ✅ |
-| Editing / deleting your own activity and replies, activity subscriptions | 🔜 next: `api/queries/activity.ts` + `components/ActivityCard.svelte` |
+| Editing your own statuses, deleting your own activity (« ⋯ » menu), who liked on heart hover, scores on completions | ✅ |
+| Editing / deleting your own replies, activity subscriptions | 🔜 next: `api/queries/activity.ts` + `components/ActivityReplies.svelte` |
+| Comparing lists with another user: affinity, shared tastes, filtered leads both ways | ✅ |
+| Share card for a media entry (copy or save as PNG) | ✅ |
 | A user's reviews (`/user/:name/reviews`, read-only) | ✅ |
 | Writing reviews, forum, recommendations voting | 🔜 |
 | User stats deep-dive (`/user/:name/stats`: scores, years, formats, statuses, countries, genres, tags, studios, seiyuu, staff) | ✅ |

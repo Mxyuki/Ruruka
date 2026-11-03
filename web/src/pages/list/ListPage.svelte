@@ -42,7 +42,7 @@
     }
     let isCurrent = true;
     otherEntries = null;
-    fetchUserList(params.name ?? '', type, session.viewer?.mediaListOptions.scoreFormat ?? 'POINT_100')
+    fetchUserList(params.name ?? '', type, session.scoreFormat)
       .then((entries) => {
         if (isCurrent) otherEntries = entries;
       })

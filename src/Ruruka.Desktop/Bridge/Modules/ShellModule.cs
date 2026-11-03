@@ -11,7 +11,11 @@ internal sealed class ShellModule(Form owner) : IBridgeModule
         router.Register<PathParams, bool>("shell.openPath", parameters => Run(() => OpenPath(parameters.Path)));
         router.Register<DialogParams, string?>("shell.pickFolder", parameters => Task.FromResult(PickFolder(parameters.Title)));
         router.Register<DialogParams, string?>("shell.pickFile", parameters => Task.FromResult(PickFile(parameters.Title, parameters.Filter)));
+        router.Register<ImageParams, bool>("shell.saveImage", parameters => SaveImageAsync(parameters.FileName, parameters.PngBase64));
     }
+
+    private const int MaxImageBytes = 20 * 1024 * 1024;
+    private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     /// <summary>Opens a web link in the default browser. Only http(s) is allowed so the UI can't launch programs.</summary>
     public static void OpenUrl(string url)
@@ -43,6 +47,33 @@ internal sealed class ShellModule(Form owner) : IBridgeModule
         return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.FileName : null;
     }
 
+    /// <summary>Saves a PNG made by the UI (share cards) where the user picks. Only real PNG data is written.</summary>
+    private async Task<bool> SaveImageAsync(string fileName, string pngBase64)
+    {
+        var bytes = DecodePng(pngBase64) ?? throw new BridgeException("Cette image n'est pas un PNG valide.");
+        var safeName = string.Concat(fileName.Split(Path.GetInvalidFileNameChars())).Trim();
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Enregistrer l'image",
+            Filter = "Image PNG|*.png",
+            DefaultExt = "png",
+            AddExtension = true,
+            FileName = safeName.Length > 0 ? safeName : "ruruka.png",
+        };
+        if (dialog.ShowDialog(owner) != DialogResult.OK) return false;
+        await File.WriteAllBytesAsync(dialog.FileName, bytes);
+        return true;
+    }
+
+    private static byte[]? DecodePng(string base64)
+    {
+        if (base64.Length > MaxImageBytes / 3 * 4 + 4) return null;
+        var buffer = new byte[base64.Length * 3 / 4];
+        if (!Convert.TryFromBase64String(base64, buffer, out var length)) return null;
+        var bytes = buffer[..length];
+        return bytes.AsSpan().StartsWith(PngSignature) ? bytes : null;
+    }
+
     private static Task<bool> Run(Action action)
     {
         action();
@@ -54,4 +85,6 @@ internal sealed class ShellModule(Form owner) : IBridgeModule
     private sealed record PathParams(string Path);
 
     private sealed record DialogParams(string? Title, string? Filter);
+
+    private sealed record ImageParams(string FileName, string PngBase64);
 }

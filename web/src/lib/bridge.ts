@@ -99,6 +99,8 @@ interface BridgeApi {
   'shell.openPath': [{ path: string }, boolean];
   'shell.pickFolder': [{ title?: string }, string | null];
   'shell.pickFile': [{ title?: string; filter?: string }, string | null];
+  /** Asks where to save a PNG; false when the user cancelled. */
+  'shell.saveImage': [{ fileName: string; pngBase64: string }, boolean];
   'window.minimize': [void, boolean];
   'window.toggleMaximize': [void, boolean];
   'window.close': [void, boolean];

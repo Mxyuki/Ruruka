@@ -8,6 +8,7 @@
   import SiteIcon from '../../components/SiteIcon.svelte';
   import ScoreInput from '../../components/ScoreInput.svelte';
   import Sticker from '../../components/Sticker.svelte';
+  import ShareDialog from './ShareDialog.svelte';
   import { formatListStatus, unitLabel, statusColor } from '../../lib/format';
   import { mediaSearchUrl } from '../../lib/searchSite';
   import { siteName } from '../../lib/siteAddress';
@@ -24,6 +25,7 @@
 
   const entry = $derived(mediaList.entryFor(media.id));
   let isEditorOpen = $state(false);
+  let isShareOpen = $state(false);
   let isFavourite = $state(false);
   let isSaving = $state(false);
 
@@ -94,6 +96,11 @@
     >
       <Icon name="heart" filled={isFavourite} />
     </button>
+    {#if entry && entry.status !== 'PLANNING'}
+      <button class="btn btn-ghost btn-icon" type="button" title="Partager ma fiche en image" onclick={() => (isShareOpen = true)}>
+        <Icon name="share" size={16} />
+      </button>
+    {/if}
     <!-- Avec un site de lecture dans les réglages, les manga se lisent dans Ruruka ; sinon, le site de recherche prend le relais -->
     {#if media.type === 'MANGA' && onread && session.mangaSite}
       <button class="chapters" type="button" title="Lire les chapitres sur {siteName(session.mangaSite)}" onclick={onread}>
@@ -123,7 +130,7 @@
     {/if}
     <div class="field">
       <span class="field-label">Ma note</span>
-      <ScoreInput value={entry?.score ?? 0} format={session.viewer?.mediaListOptions.scoreFormat ?? 'POINT_100'} onchange={setScore} />
+      <ScoreInput value={entry?.score ?? 0} format={session.scoreFormat} onchange={setScore} />
     </div>
   </div>
 
@@ -134,6 +141,9 @@
 </div>
 
 <ListEditor {media} open={isEditorOpen} onclose={() => (isEditorOpen = false)} />
+{#if entry}
+  <ShareDialog {media} {entry} open={isShareOpen} onclose={() => (isShareOpen = false)} />
+{/if}
 
 <style>
   /* <-- Même pastille que le bouton de recherche, pour garder la rangée d'actions régulière --> */

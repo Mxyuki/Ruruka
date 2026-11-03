@@ -1,6 +1,6 @@
 import { AniListError, setAccessToken } from '../api/client';
 import { fetchViewer, saveCustomListNames } from '../api/queries/user';
-import type { MediaType, Viewer } from '../api/types';
+import type { MediaType, ScoreFormat, Viewer } from '../api/types';
 import { invoke, type Settings, type SettingsPatch } from '../lib/bridge';
 import { siteBase } from '../lib/siteAddress';
 
@@ -19,6 +19,8 @@ class Session {
   mangaSite = $derived(siteBase(this.settings?.mangaSiteUrl ?? ''));
   /** Base URL of the server holding anime song files; null hides the song players. */
   songFileHost = $derived(siteBase(this.settings?.songFileHostUrl ?? ''));
+  /** The viewer's score format; other users' scores are asked for in it. */
+  scoreFormat: ScoreFormat = $derived(this.viewer?.mediaListOptions.scoreFormat ?? 'POINT_100');
 
   status: SessionStatus = $derived.by(() => {
     if (this.isLoading) return 'loading';

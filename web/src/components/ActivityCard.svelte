@@ -1,22 +1,29 @@
 <script lang="ts">
-  import { toggleLike, type Activity } from '../api/queries/activity';
-  import { formatRelativeTime } from '../lib/format';
+  import { deleteActivity, type Activity } from '../api/queries/activity';
+  import { formatRelativeTime, formatScoreOutOf } from '../lib/format';
   import { sanitizeHtml } from '../lib/html';
   import { mediaPath, userPath } from '../lib/routes';
+  import { session } from '../state/session.svelte';
   import { toasts } from '../state/toasts.svelte';
+  import ActivityMenu from './ActivityMenu.svelte';
   import ActivityReplies from './ActivityReplies.svelte';
   import Icon from './Icon.svelte';
   import LikeButton from './LikeButton.svelte';
+  import StatusEditor from './StatusEditor.svelte';
 
   interface Props {
     activity: Activity;
     /** Tighter layout for side columns. */
     compact?: boolean;
+    /** Called once the viewer has deleted this activity. */
+    ondeleted?: () => void;
   }
 
-  let { activity = $bindable(), compact = false }: Props = $props();
+  let { activity = $bindable(), compact = false, ondeleted }: Props = $props();
 
   let showsReplies = $state(false);
+  let isEditing = $state(false);
+  const isOwn = $derived(activity.user.id === session.viewer?.id);
 
   // <-- AniList renvoie ses phrases d'activité en anglais : on traduit les plus courantes -->
   const statusPhrases: Record<string, [single: string, range: string]> = {
@@ -41,16 +48,20 @@
     return list.progress ? `${verb} ${list.progress} de` : verb;
   }
 
-  async function like() {
-    const previous = { isLiked: activity.isLiked, likeCount: activity.likeCount };
-    activity.isLiked = !activity.isLiked;
-    activity.likeCount += activity.isLiked ? 1 : -1;
+  async function remove(): Promise<boolean> {
     try {
-      Object.assign(activity, await toggleLike(activity.id, 'ACTIVITY'));
+      await deleteActivity(activity.id);
+      ondeleted?.();
+      return true;
     } catch (error) {
-      Object.assign(activity, previous);
-      toasts.error(error, 'Impossible d’aimer');
+      toasts.error(error, 'Impossible de supprimer cette activité');
+      return false;
     }
+  }
+
+  function saveText(html: string) {
+    if (activity.kind === 'text') activity.text = html;
+    isEditing = false;
   }
 </script>
 
@@ -61,19 +72,28 @@
     <div class="meta">
       <a class="name" href="#{userPath(activity.user.name)}">{activity.user.name}</a>
       <time class="faint" datetime={new Date(activity.createdAt * 1000).toISOString()}>{formatRelativeTime(activity.createdAt)}</time>
+      {#if isOwn}
+        <span class="menu"><ActivityMenu canEdit={activity.kind === 'text'} onedit={() => (isEditing = true)} ondelete={remove} /></span>
+      {/if}
     </div>
 
     {#if activity.kind === 'list'}
       <p class="sentence">
         {describe(activity)}
         <a class="media-link" href="#{mediaPath(activity.media.id)}">{activity.media.title.userPreferred}</a>
+        <!-- La note du dossier résolu, posée comme un tampon -->
+        {#if activity.score}
+          <span class="score" title="Note de {activity.user.name}">{formatScoreOutOf(activity.score, session.scoreFormat)}</span>
+        {/if}
       </p>
+    {:else if isEditing}
+      <StatusEditor activityId={activity.id} onsaved={saveText} oncancel={() => (isEditing = false)} />
     {:else}
       <div class="rich-text text">{@html sanitizeHtml(activity.text)}</div>
     {/if}
 
     <div class="actions">
-      <LikeButton isLiked={activity.isLiked} count={activity.likeCount} onclick={like} />
+      <LikeButton bind:target={activity} type="ACTIVITY" />
       <button class="reply-toggle" class:is-open={showsReplies} type="button" aria-expanded={showsReplies} onclick={() => (showsReplies = !showsReplies)}>
         <Icon name="chat" size={16} />
         {activity.replyCount || ''}
@@ -143,6 +163,10 @@
     font-weight: 700;
   }
 
+  .menu {
+    margin: -4px -6px -4px auto;
+  }
+
   .name:hover,
   .media-link:hover {
     color: var(--textSoft);
@@ -163,6 +187,21 @@
   .media-link {
     color: var(--textMain);
     font-weight: 700;
+  }
+
+  .score {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 8px;
+    border: var(--outlineThin);
+    border-radius: var(--radiusPill);
+    background: var(--colorStar);
+    color: var(--textMain);
+    font-family: var(--fontFile);
+    font-size: var(--fontSizeXs);
+    font-weight: 700;
+    white-space: nowrap;
+    transform: rotate(-3deg);
   }
 
   /* <-- Un long post défile dans sa carte au lieu d'être coupé --> */

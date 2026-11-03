@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchReplies, postReply, toggleLike, type ActivityReply } from '../api/queries/activity';
+  import { fetchReplies, postReply, type ActivityReply } from '../api/queries/activity';
   import { formatRelativeTime } from '../lib/format';
   import { sanitizeHtml } from '../lib/html';
   import { userPath } from '../lib/routes';
@@ -38,25 +38,13 @@
       throw error;
     }
   }
-
-  async function like(target: ActivityReply) {
-    const previous = { isLiked: target.isLiked, likeCount: target.likeCount };
-    target.isLiked = !target.isLiked;
-    target.likeCount += target.isLiked ? 1 : -1;
-    try {
-      Object.assign(target, await toggleLike(target.id, 'ACTIVITY_REPLY'));
-    } catch (error) {
-      Object.assign(target, previous);
-      toasts.error(error, 'Impossible d’aimer cette réponse');
-    }
-  }
 </script>
 
 <div class="replies">
   {#if isLoading}
     <p class="faint">On recueille les témoignages…</p>
   {:else}
-    {#each replies as reply (reply.id)}
+    {#each replies as reply, index (reply.id)}
       <div class="reply">
         <a href="#{userPath(reply.user.name)}"><img src={reply.user.avatar.medium} alt="" loading="lazy" /></a>
         <div class="body">
@@ -66,7 +54,7 @@
           </div>
           <div class="rich-text">{@html sanitizeHtml(reply.text)}</div>
         </div>
-        <LikeButton isLiked={reply.isLiked} count={reply.likeCount} small onclick={() => like(reply)} />
+        <LikeButton bind:target={replies[index]!} type="ACTIVITY_REPLY" small />
       </div>
     {/each}
   {/if}

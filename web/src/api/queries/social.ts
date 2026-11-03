@@ -37,3 +37,17 @@ export function fetchRelation(userId: number, relation: Relation): Promise<Socia
   });
 }
 
+
+const userSearchQuery = `
+  query ($search: String) {
+    Page(perPage: 8) { users(search: $search, sort: SEARCH_MATCH) { id name avatar { medium } } }
+  }
+`;
+
+/** AniList users whose name matches, best match first. */
+export function searchUsers(search: string): Promise<SocialUser[]> {
+  return cached(`userSearch:${search.toLowerCase()}`, 5 * minuteMs, async () => {
+    const { Page } = await gql<{ Page: { users: SocialUser[] } }>(userSearchQuery, { search });
+    return Page.users;
+  });
+}

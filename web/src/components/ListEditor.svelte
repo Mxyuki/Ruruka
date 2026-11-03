@@ -19,7 +19,7 @@
   let { media, open, onclose }: Props = $props();
 
   const entry = $derived(mediaList.entryFor(media.id));
-  const scoreFormat = $derived(session.viewer?.mediaListOptions.scoreFormat ?? 'POINT_100');
+  const scoreFormat = $derived(session.scoreFormat);
 
   let draft = $state<Required<Omit<ListEntryChanges, 'progressVolumes' | 'customLists' | 'hiddenFromStatusLists'>>>(emptyDraft());
   let isSaving = $state(false);

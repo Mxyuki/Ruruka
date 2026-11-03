@@ -1,6 +1,6 @@
 import { cached, minuteMs } from '../cache';
 import { gql } from '../client';
-import type { ListEntry, ListEntryChanges, MediaType, PublicListEntry, ScoreFormat } from '../types';
+import type { ListEntry, ListEntryChanges, MediaListStatus, MediaSummary, MediaType, PublicListEntry, ScoreFormat } from '../types';
 import { listEntryFields, mediaSummaryFields } from './fragments';
 
 const listCollectionQuery = `
@@ -53,6 +53,46 @@ export function fetchUserList(userName: string, type: MediaType, scoreFormat: Sc
   return cached(`userList:${userName.toLowerCase()}:${type}:${scoreFormat}`, 5 * minuteMs, async () => {
     const { MediaListCollection } = await gql<{ MediaListCollection: { lists: { entries: PublicListEntry[] }[] } }>(
       userListQuery,
+      { userName, type, scoreFormat },
+    );
+    return uniqueEntries(MediaListCollection.lists);
+  });
+}
+
+/** A list entry as the comparison page reads it: both score scales, and what the media is about. */
+export interface ComparisonEntry {
+  id: number;
+  mediaId: number;
+  status: MediaListStatus;
+  /** 0–100 for the maths; 0 when unscored. */
+  score100: number;
+  /** In the viewer's format, for display and filters. */
+  score: number;
+  media: MediaSummary & { genres: string[]; popularity: number | null; tags: { name: string; rank: number; isMediaSpoiler: boolean }[] };
+}
+
+const comparisonListQuery = `
+  query ($userName: String, $type: MediaType, $scoreFormat: ScoreFormat) {
+    MediaListCollection(userName: $userName, type: $type, forceSingleCompletedList: true) {
+      lists {
+        entries {
+          id
+          mediaId
+          status
+          score100: score(format: POINT_100)
+          score(format: $scoreFormat)
+          media { ${mediaSummaryFields} genres popularity tags { name rank isMediaSpoiler } }
+        }
+      }
+    }
+  }
+`;
+
+/** A user's whole list with genres and tags, to compare two detectives' tastes. */
+export function fetchComparisonList(userName: string, type: MediaType, scoreFormat: ScoreFormat): Promise<ComparisonEntry[]> {
+  return cached(`compareList:${userName.toLowerCase()}:${type}:${scoreFormat}`, 5 * minuteMs, async () => {
+    const { MediaListCollection } = await gql<{ MediaListCollection: { lists: { entries: ComparisonEntry[] }[] } }>(
+      comparisonListQuery,
       { userName, type, scoreFormat },
     );
     return uniqueEntries(MediaListCollection.lists);

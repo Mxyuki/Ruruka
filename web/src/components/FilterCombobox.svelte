@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import type { TagGroup } from '../../api/queries/search';
-  import { normalizeForMatch } from '../../lib/titleMatch';
-  import { toasts } from '../../state/toasts.svelte';
+  import type { TagGroup } from '../api/queries/search';
+  import { normalizeForMatch } from '../lib/titleMatch';
+  import { toasts } from '../state/toasts.svelte';
 
   interface Props {
     label: string;

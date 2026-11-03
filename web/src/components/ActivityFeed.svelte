@@ -47,7 +47,7 @@
 {#if activities.length}
   <div class="card feed">
     {#each activities.slice(0, visibleCount) as activity, index (activity.id)}
-      <ActivityCard bind:activity={activities[index]!} compact={Boolean(preview)} />
+      <ActivityCard bind:activity={activities[index]!} compact={Boolean(preview)} ondeleted={() => activities.splice(index, 1)} />
     {/each}
   </div>
   {#if preview}

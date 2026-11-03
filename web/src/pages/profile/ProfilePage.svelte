@@ -7,6 +7,7 @@
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
   import Section from '../../components/Section.svelte';
+  import FavouriteGrid from './FavouriteGrid.svelte';
   import { renderAniListMarkdown } from '../../lib/markdown';
   import type { RouteParams } from '../../lib/router.svelte';
   import { aboutEditorPath, characterPath, staffPath, studioPath, userListPath, userSectionPath } from '../../lib/routes';
@@ -63,6 +64,9 @@
         <a class="btn btn-sm" href="#{userSectionPath(user.name, 'social')}"><Icon name="users" size={14} /> Social</a>
         <a class="btn btn-sm" href="#{userSectionPath(user.name, 'stats')}"><Icon name="grid" size={14} /> Stats</a>
         <a class="btn btn-sm" href="#{userSectionPath(user.name, 'reviews')}"><Icon name="edit" size={14} /> Critiques</a>
+        {#if !isViewer}
+          <a class="btn btn-sm btn-primary" href="#{userSectionPath(user.name, 'compare')}"><Icon name="search" size={14} /> Comparer nos carnets</a>
+        {/if}
         <a class="btn btn-sm" href="https://anilist.co/user/{user.name}" target="_blank" rel="noopener noreferrer">Voir sur AniList</a>
       </div>
     </div>
@@ -118,9 +122,9 @@
         {#each [['Anime favoris', user.favourites.anime.nodes], ['Manga favoris', user.favourites.manga.nodes]] as const as [title, nodes] (title)}
           {#if nodes.length}
             <Section {title}>
-              <div class="media-grid">
-                {#each nodes as media (media.id)}<MediaCard {media} />{/each}
-              </div>
+              <FavouriteGrid items={nodes} keyOf={(media) => media.id} minItemWidth={168} columnGap="var(--space5)" rowGap="var(--space6)">
+                {#snippet cell(media)}<MediaCard {media} />{/snippet}
+              </FavouriteGrid>
             </Section>
           {/if}
         {/each}
@@ -128,14 +132,14 @@
         {#each [['Personnages favoris', user.favourites.characters.nodes, characterPath], ['Créateurs favoris', user.favourites.staff.nodes, staffPath]] as const as [title, nodes, pathFor] (title)}
           {#if nodes.length}
             <Section {title}>
-              <div class="people">
-                {#each nodes as person (person.id)}
-                  <a href="#{pathFor(person.id)}" title={person.name.userPreferred}>
+              <FavouriteGrid items={nodes} keyOf={(person) => person.id} minItemWidth={96} columnGap="var(--space4)" rowGap="var(--space4)">
+                {#snippet cell(person)}
+                  <a class="person" href="#{pathFor(person.id)}" title={person.name.userPreferred} style:--tilt="{((person.id * 37) % 5) - 2}deg">
                     <img src={person.image.medium} alt="" loading="lazy" />
                     <span>{person.name.userPreferred}</span>
                   </a>
-                {/each}
-              </div>
+                {/snippet}
+              </FavouriteGrid>
             </Section>
           {/if}
         {/each}
@@ -153,7 +157,7 @@
 
       <aside>
         <Section title="Dernières nouvelles">
-          <ActivityFeed load={(page) => fetchUserActivity(user.id, page)} emptyMessage="Aucune nouvelle récente." />
+          <ActivityFeed load={(page) => fetchUserActivity(user.id, session.scoreFormat, page)} emptyMessage="Aucune nouvelle récente." />
         </Section>
       </aside>
     </div>
@@ -257,7 +261,7 @@
 
   .columns {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 26vw, 470px);
     gap: var(--space6);
   }
 
@@ -311,45 +315,34 @@
     gap: var(--space2);
   }
 
-  .people {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-    gap: var(--space4);
-  }
-
-  .people a {
+  /* <-- Chaque fiche garde la même petite inclinaison, comme les cartes d'anime --> */
+  .person {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: var(--fontSizeXs);
-    font-weight: 800;
-    text-align: center;
-  }
-
-  .people a {
     padding: 5px 5px 8px;
     border: var(--outline);
     background: var(--colorPaper);
     box-shadow: var(--stickerShadow);
+    font-size: var(--fontSizeXs);
+    font-weight: 800;
+    text-align: center;
+    transform: rotate(var(--tilt));
     transition: transform 0.25s var(--easeSpring);
   }
 
-  .people a:nth-child(odd) {
-    transform: rotate(-2deg);
-  }
-
-  .people a:hover {
+  .person:hover {
     transform: rotate(0deg) scale(1.05);
   }
 
-  .people img {
+  .person img {
     width: 100%;
     aspect-ratio: 2 / 3;
     border: var(--outlineThin);
     object-fit: cover;
   }
 
-  .people a:hover span {
+  .person:hover span {
     color: var(--textSoft);
   }
 </style>

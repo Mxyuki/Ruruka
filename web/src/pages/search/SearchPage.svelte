@@ -11,7 +11,7 @@
   import { navigate, replaceQuery, router, type RouteParams } from '../../lib/router.svelte';
   import { mediaList } from '../../state/mediaList.svelte';
   import { toasts } from '../../state/toasts.svelte';
-  import FilterCombobox from './FilterCombobox.svelte';
+  import FilterCombobox from '../../components/FilterCombobox.svelte';
   import {
     defaultTagRank,
     excludedNames,
@@ -20,11 +20,11 @@
     requiredNames,
     togglePick,
     updatePick,
-  } from './filterPicks';
+  } from '../../lib/filterPicks';
   import ListStatusFilter from './ListStatusFilter.svelte';
   import { defaultSort, readSearchState, writeSearchState } from './searchQuery';
   import { SearchResults } from './searchResults.svelte';
-  import PickedFilters from './PickedFilters.svelte';
+  import PickedFilters from '../../components/PickedFilters.svelte';
   import TagRankDialog from './TagRankDialog.svelte';
 
   let { params }: { params: RouteParams } = $props();

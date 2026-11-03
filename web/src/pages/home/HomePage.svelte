@@ -154,7 +154,7 @@
       </Section>
       <Section title="Les amis">
         <ActivityFeed
-          load={(page) => fetchFriendActivity(session.viewer?.id ?? 0, page)}
+          load={(page) => fetchFriendActivity(session.viewer?.id ?? 0, session.scoreFormat, page)}
           emptyMessage="Pas de nouvelles de tes amis pour l'instant."
           preview={{ count: friendsPreviewCount, href: '#/social' }}
         />

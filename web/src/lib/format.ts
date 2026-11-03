@@ -102,6 +102,13 @@ export function formatUserScore(score: number, format: ScoreFormat): string {
   return format === 'POINT_10_DECIMAL' ? score.toFixed(1) : String(score);
 }
 
+/** A score with its scale when it has one: "8/10", "85/100", "★★★★". */
+export function formatScoreOutOf(score: number, format: ScoreFormat): string {
+  const label = formatUserScore(score, format);
+  if (!score || format === 'POINT_3' || format === 'POINT_5') return label;
+  return `${label}/${scoreScales[format].max}`;
+}
+
 export const todayAsFuzzyDate = (): FuzzyDate => {
   const now = new Date();
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };

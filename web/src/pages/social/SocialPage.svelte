@@ -13,6 +13,7 @@
   import { userPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
+  import UserSearch from './UserSearch.svelte';
 
   type Tab = 'activity' | 'following' | 'followers';
   type Filter = 'all' | 'mutual' | 'oneWay';
@@ -88,14 +89,18 @@
     note={isLoading ? undefined : `${following.length} suivis · ${followers.length} abonnés · ${mutualCount} amis mutuels`}
   />
 
-  <div class="tabs">
-    <button class="chip" class:is-active={tab === 'activity'} type="button" onclick={() => selectTab('activity')}>Nouvelles</button>
-    <button class="chip" class:is-active={tab === 'following'} type="button" onclick={() => selectTab('following')}>
-      Suivis <span class="faint">{following.length}</span>
-    </button>
-    <button class="chip" class:is-active={tab === 'followers'} type="button" onclick={() => selectTab('followers')}>
-      Abonnés <span class="faint">{followers.length}</span>
-    </button>
+  <!-- Onglets à gauche, recherche dans la colonne de l'agence -->
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="chip" class:is-active={tab === 'activity'} type="button" onclick={() => selectTab('activity')}>Nouvelles</button>
+      <button class="chip" class:is-active={tab === 'following'} type="button" onclick={() => selectTab('following')}>
+        Suivis <span class="faint">{following.length}</span>
+      </button>
+      <button class="chip" class:is-active={tab === 'followers'} type="button" onclick={() => selectTab('followers')}>
+        Abonnés <span class="faint">{followers.length}</span>
+      </button>
+    </div>
+    <UserSearch {followingIds} {followerIds} />
   </div>
 
   {#if tab === 'activity'}
@@ -104,7 +109,7 @@
         <div class="card composer">
           <TextComposer placeholder="Partage un indice avec tes amis…" submitLabel="Publier" avatar={session.viewer?.avatar.medium} onsubmit={post} />
         </div>
-        <ActivityFeed bind:this={feed} load={(page) => fetchFriendActivity(viewerId, page)} emptyMessage="Pas de nouvelles de tes amis pour l'instant." />
+        <ActivityFeed bind:this={feed} load={(page) => fetchFriendActivity(viewerId, session.scoreFormat, page)} emptyMessage="Pas de nouvelles de tes amis pour l'instant." />
       </div>
 
       <aside class="card agency">
@@ -152,11 +157,23 @@
 </div>
 
 <style>
+  /* <-- Mêmes colonnes que les nouvelles et l'agence, pour que la recherche tombe pile au-dessus de la carte --> */
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 900px) minmax(260px, 340px);
+    align-items: center;
+    gap: var(--space3) var(--space6);
+    margin-bottom: var(--space4);
+  }
+
   .tabs,
   .filters {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space2);
+  }
+
+  .filters {
     margin-bottom: var(--space4);
   }
 
@@ -178,7 +195,8 @@
   }
 
   @media (max-width: 1180px) {
-    .activity-layout {
+    .activity-layout,
+    .toolbar {
       grid-template-columns: minmax(0, 1fr);
     }
   }

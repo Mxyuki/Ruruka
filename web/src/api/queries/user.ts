@@ -82,11 +82,11 @@ const userProfileQuery = `
         manga { ${statisticsFields} chaptersRead volumesRead }
       }
       favourites {
-        anime(perPage: 12) { nodes { ${mediaSummaryFields} } }
-        manga(perPage: 12) { nodes { ${mediaSummaryFields} } }
-        characters(perPage: 12) { nodes { id name { userPreferred } image { medium } } }
-        staff(perPage: 12) { nodes { id name { userPreferred } image { medium } } }
-        studios(perPage: 12) { nodes { id name } }
+        anime(perPage: 25) { nodes { ${mediaSummaryFields} } }
+        manga(perPage: 25) { nodes { ${mediaSummaryFields} } }
+        characters(perPage: 25) { nodes { id name { userPreferred } image { medium } } }
+        staff(perPage: 25) { nodes { id name { userPreferred } image { medium } } }
+        studios(perPage: 25) { nodes { id name } }
       }
     }
   }

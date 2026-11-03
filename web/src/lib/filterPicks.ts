@@ -1,6 +1,6 @@
-import type { MediaListStatus } from '../../api/types';
+import type { MediaListStatus } from '../api/types';
 
-/** A genre or tag chosen in Explorer, either required or excluded. */
+/** A genre or tag picked as a filter, either required or excluded. */
 export interface FilterPick {
   name: string;
   isExcluded: boolean;

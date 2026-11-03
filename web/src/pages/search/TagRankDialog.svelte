@@ -1,6 +1,6 @@
 <script lang="ts">
   import Modal from '../../components/Modal.svelte';
-  import { defaultTagRank, type FilterPick } from './filterPicks';
+  import { defaultTagRank, type FilterPick } from '../../lib/filterPicks';
 
   interface Props {
     open: boolean;

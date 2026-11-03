@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Icon from '../../components/Icon.svelte';
-  import { togglePick, updatePick, type FilterPick } from './filterPicks';
+  import Icon from './Icon.svelte';
+  import { togglePick, updatePick, type FilterPick } from '../lib/filterPicks';
 
   interface Props {
     label: string;

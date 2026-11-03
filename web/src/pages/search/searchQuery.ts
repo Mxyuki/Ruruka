@@ -1,6 +1,6 @@
 import type { MediaSort } from '../../api/queries/search';
 import { listStatuses, type MediaFormat, type MediaSeason, type MediaStatus } from '../../api/types';
-import { defaultTagRank, type FilterPick, type ListChoice } from './filterPicks';
+import { defaultTagRank, type FilterPick, type ListChoice } from '../../lib/filterPicks';
 
 /** Everything Explorer keeps in its address, so going back to it restores the same search. */
 export interface SearchState {
