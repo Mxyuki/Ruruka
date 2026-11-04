@@ -94,7 +94,7 @@
       <div class="option">
         <Toggle
           checked={session.settings?.isPlayerKeptOpen ?? true}
-          label="Garder mpv ouvert à la fin d’un épisode : le suivant se lance dans la même fenêtre (pratique en partage d’écran sur Discord)"
+          label="Garder le lecteur ouvert à la fin d’un épisode : le suivant se lance dans la même fenêtre (pratique en partage d’écran sur Discord)"
           onchange={(isPlayerKeptOpen) => update({ isPlayerKeptOpen })}
         />
       </div>

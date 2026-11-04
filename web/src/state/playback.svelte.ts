@@ -1,5 +1,5 @@
 import type { MediaSummary } from '../api/types';
-import { invoke, on } from '../lib/bridge';
+import { invoke, on, type SharedFile } from '../lib/bridge';
 import { library } from './library.svelte';
 import { mediaList } from './mediaList.svelte';
 import { session } from './session.svelte';
@@ -76,21 +76,41 @@ class Playback {
     });
   }
 
-  private async play(media: MediaSummary, episode: number): Promise<void> {
+  /** Plays this PC's copy of the host's episode; the session decides what comes next, so nothing is offered. */
+  async playShared(media: MediaSummary, episode: number): Promise<boolean> {
+    this.playlist = null;
+    return this.play(media, episode, true);
+  }
+
+  /** Plays the host's stream; the local address stays inside the host process. */
+  async playStream(media: MediaSummary, episode: number, file: SharedFile): Promise<boolean> {
+    this.playlist = null;
+    const title = media.title.userPreferred;
+    return this.launch(media, episode, true, () => invoke('stream.play', { mediaId: media.id, episode, title, ...file }));
+  }
+
+  private async play(media: MediaSummary, episode: number, isShared = false): Promise<boolean> {
     const file = library.episodesFor(media.id).get(episode);
     if (!file) {
       toasts.error(`L’épisode ${episode} n’est pas dans ton dossier.`);
-      return;
+      return false;
     }
+    const title = media.title.userPreferred;
+    return this.launch(media, episode, isShared, () => invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title }));
+  }
+
+  private async launch(media: MediaSummary, episode: number, isShared: boolean, start: () => Promise<boolean>): Promise<boolean> {
     try {
-      await invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title: media.title.userPreferred });
-      const started = { media, episode, isWatched: false, hasOfferedNext: false, isRemote: false };
+      await start();
+      const started = { media, episode, isWatched: false, hasOfferedNext: isShared, isRemote: false };
       // <-- L'épisode remplace le précédent dans la même fenêtre mpv, qui ne sera donc jamais « fermé » -->
       if (this.nowPlaying) this.sessions.delete(sessionKey(this.nowPlaying.media.id, this.nowPlaying.episode));
       this.sessions.set(sessionKey(media.id, episode), started);
       this.nowPlaying = started;
+      return true;
     } catch (error) {
-      toasts.error(error, 'Impossible de lancer mpv');
+      toasts.error(error, 'Impossible de lancer le lecteur');
+      return false;
     }
   }
 

@@ -14,6 +14,12 @@ public sealed record EpisodeWatched(int MediaId, int Episode, string Title);
 /// <summary>Payload of "player.progress": where playback is, sent at most every <see cref="MpvSession.ProgressInterval"/>.</summary>
 public sealed record PlaybackProgress(int MediaId, int Episode, double PositionSeconds, double DurationSeconds);
 
+/// <summary>Payload of "player.sync": the exact playback state, sent on pause, after a seek and every <see cref="MpvSession.SyncInterval"/>.</summary>
+public sealed record PlaybackSyncPoint(int MediaId, int Episode, double PositionSeconds, double DurationSeconds, bool IsPaused);
+
+/// <summary>How to start mpv: which executable, and the bundled Ruruka config when it is the bundled player.</summary>
+internal sealed record MpvLaunch(string ExecutablePath, string? ConfigDirectory);
+
 /// <summary>
 /// Runs one mpv process and follows its playback through mpv's JSON IPC over a named pipe.
 /// Another episode can be loaded into the same window with <see cref="TryLoadAsync"/>.
@@ -25,12 +31,16 @@ internal sealed class MpvSession
     // The UI turns progress into AniList profile updates, so a coarse pace is enough.
     internal static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(15);
 
+    // A friend corrects against each point, so this is also how long a small drift can last.
+    internal static readonly TimeSpan SyncInterval = TimeSpan.FromSeconds(5);
+
     private const int DurationRequestId = 1;
 
     private readonly IBridgeEvents _events;
     private readonly Process _process;
     private readonly string _pipeName = $"ruruka-mpv-{Guid.NewGuid():N}";
     private readonly Stopwatch _sinceProgress = new();
+    private readonly Stopwatch _sinceSync = new();
 
     // The pipe reader and bridge calls run on different threads; the episode state is swapped under this lock.
     private readonly object _gate = new();
@@ -41,20 +51,29 @@ internal sealed class MpvSession
     private WatchTracker _tracker;
     private double _lastPosition;
     private bool _hasReachedEnd;
+    private bool _isPaused;
+    private bool _isPositionKnown;
+    private double _appliedSpeed = 1;
+
+    // The host's latest position during a synced session, applied once this mpv knows its own position.
+    private (double PositionSeconds, bool IsPaused)? _hostPosition;
 
     // Episodes sent with loadfile that mpv hasn't opened yet; until then, positions still belong to the previous file.
     private int _pendingLoads;
 
-    private MpvSession(string mpvPath, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen)
+    private MpvSession(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
     {
         _target = target;
         _tracker = tracker;
         _events = events;
-        var startInfo = new ProcessStartInfo(mpvPath) { UseShellExecute = false };
+        var startInfo = new ProcessStartInfo(launch.ExecutablePath) { UseShellExecute = false };
         startInfo.ArgumentList.Add(IpcServerArgument(_pipeName));
+        if (launch.ConfigDirectory is not null) startInfo.ArgumentList.Add($"--config-dir={launch.ConfigDirectory}");
         startInfo.ArgumentList.Add("--force-window=immediate");
         if (isKeptOpen) startInfo.ArgumentList.Add("--keep-open=yes");
         startInfo.ArgumentList.Add($"--title={WindowTitle(target)}");
+        startInfo.ArgumentList.Add($"--force-media-title={WindowTitle(target)}");
+        foreach (var (name, value) in options) startInfo.ArgumentList.Add($"--{name}={value}");
         startInfo.ArgumentList.Add("--");
         startInfo.ArgumentList.Add(target.FilePath);
         _process = new Process { StartInfo = startInfo };
@@ -70,9 +89,10 @@ internal sealed class MpvSession
 
     /// <summary>Starts mpv and tracks it in the background until it exits.</summary>
     /// <param name="isKeptOpen">mpv stays on the last frame instead of quitting when the episode ends.</param>
-    public static MpvSession Start(string mpvPath, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen)
+    /// <param name="options">mpv options for this file, such as the cache of a stream.</param>
+    public static MpvSession Start(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
     {
-        var session = new MpvSession(mpvPath, target, tracker, events, isKeptOpen);
+        var session = new MpvSession(launch, target, tracker, events, isKeptOpen, options);
         session._process.Start();
         events.Emit("player.started", new { target.MediaId, target.Episode });
         _ = session.TrackAsync();
@@ -80,7 +100,7 @@ internal sealed class MpvSession
     }
 
     /// <summary>Plays another episode in this mpv window; false when mpv is gone or its pipe isn't connected yet.</summary>
-    public async Task<bool> TryLoadAsync(PlaybackTarget target, WatchTracker tracker)
+    public async Task<bool> TryLoadAsync(PlaybackTarget target, WatchTracker tracker, IReadOnlyDictionary<string, string> options)
     {
         PlaybackTarget previousTarget;
         WatchTracker previousTracker;
@@ -93,8 +113,12 @@ internal sealed class MpvSession
         }
 
         // <-- La pause survit au changement de fichier, et mpv se met en pause à la fin d'un épisode gardé ouvert -->
-        var isSent = await TrySendAsync("loadfile", target.FilePath, "replace")
+        var isSent = true;
+        foreach (var (name, value) in options) isSent = isSent && await TrySendAsync("set_property", name, value);
+        isSent = isSent
+            && await TrySendAsync("loadfile", target.FilePath, "replace")
             && await TrySendAsync("set_property", "title", WindowTitle(target))
+            && await TrySendAsync("set_property", "force-media-title", WindowTitle(target))
             && await TrySendAsync("set_property", "pause", false);
         if (isSent)
         {
@@ -110,13 +134,53 @@ internal sealed class MpvSession
         return false;
     }
 
+    /// <summary>Follows the host of a synced session: the point waits here until this mpv reports where it is.</summary>
+    public void FollowHost(double positionSeconds, bool isPaused)
+    {
+        lock (_gate)
+        {
+            if (_hasExited) return;
+            _hostPosition = (positionSeconds, isPaused);
+            if (_isPositionKnown) ApplyHostPosition();
+        }
+    }
+
+    /// <summary>Stops following the host and returns to normal speed.</summary>
+    public void ReleaseFromHost()
+    {
+        lock (_gate)
+        {
+            _hostPosition = null;
+            if (_isPositionKnown) SetSpeed(1);
+        }
+    }
+
+    private void ApplyHostPosition()
+    {
+        if (_hostPosition is not { } host) return;
+        _hostPosition = null;
+        if (host.IsPaused != _isPaused) _ = TrySendAsync("set_property", "pause", host.IsPaused);
+        var correction = SyncCorrection.Decide(_lastPosition, host.PositionSeconds, host.IsPaused);
+        SetSpeed(correction.Speed);
+        if (correction.SeekToSeconds is { } seekTo) _ = TrySendAsync("seek", seekTo, "absolute+exact");
+    }
+
+    private void SetSpeed(double speed)
+    {
+        if (Math.Abs(speed - _appliedSpeed) < 0.001) return;
+        _appliedSpeed = speed;
+        _ = TrySendAsync("set_property", "speed", speed);
+    }
+
     private void SwitchEpisode(PlaybackTarget target, WatchTracker tracker)
     {
         _target = target;
         _tracker = tracker;
         _lastPosition = 0;
         _hasReachedEnd = false;
+        _isPositionKnown = false;
         _sinceProgress.Reset();
+        _sinceSync.Reset();
     }
 
     private async Task TrackAsync()
@@ -167,6 +231,7 @@ internal sealed class MpvSession
         await TrySendAsync("observe_property", 1, "time-pos");
         await TrySendAsync("observe_property", 2, "duration");
         await TrySendAsync("observe_property", 3, "eof-reached");
+        await TrySendAsync("observe_property", 4, "pause");
 
         using var reader = new StreamReader(pipe, Encoding.UTF8);
         while (await reader.ReadLineAsync() is { } line)
@@ -221,6 +286,9 @@ internal sealed class MpvSession
                 case "property-change" when _pendingLoads == 0:
                     HandlePropertyChange(root);
                     break;
+                case "playback-restart" when _pendingLoads == 0:
+                    ReportSync();
+                    break;
             }
         }
     }
@@ -247,6 +315,10 @@ internal sealed class MpvSession
             case "eof-reached" when data.ValueKind == JsonValueKind.True:
                 ReportEnd();
                 break;
+            case "pause" when data.ValueKind is JsonValueKind.True or JsonValueKind.False:
+                _isPaused = data.GetBoolean();
+                ReportSync();
+                break;
         }
     }
 
@@ -263,6 +335,15 @@ internal sealed class MpvSession
             _events.Emit("player.watched", new EpisodeWatched(_target.MediaId, _target.Episode, _target.Title));
         }
         ReportProgress(position);
+        _isPositionKnown = true;
+        ApplyHostPosition();
+        if (!_sinceSync.IsRunning || _sinceSync.Elapsed >= SyncInterval) ReportSync();
+    }
+
+    private void ReportSync()
+    {
+        _sinceSync.Restart();
+        _events.Emit("player.sync", new PlaybackSyncPoint(_target.MediaId, _target.Episode, _lastPosition, _tracker.DurationSeconds, _isPaused));
     }
 
     // With keep-open, mpv stays on the last frame, so the end of the episode is reported here rather than by "player.closed".

@@ -17,7 +17,19 @@ internal sealed class PlayerModule(PlayerService player) : IBridgeModule
             await player.PlayAsync(target);
             return true;
         });
+        router.Register<SyncPoint, bool>("player.followHost", point =>
+        {
+            player.FollowHost(point.PositionSeconds, point.IsPaused);
+            return Task.FromResult(true);
+        });
+        router.Register("player.releaseFromHost", () =>
+        {
+            player.ReleaseFromHost();
+            return Task.FromResult(true);
+        });
     }
 
     private sealed record PathParams(string Path);
+
+    private sealed record SyncPoint(double PositionSeconds, bool IsPaused);
 }

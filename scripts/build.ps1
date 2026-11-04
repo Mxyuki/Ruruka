@@ -13,6 +13,7 @@ finally {
     Pop-Location
 }
 
+& "$PSScriptRoot/fetch-mpv.ps1"
 dotnet test "$root/tests/Ruruka.Desktop.Tests" -c Release
 dotnet publish "$root/src/Ruruka.Desktop" -c Release -r win-x64 --self-contained false `
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "$root/dist"

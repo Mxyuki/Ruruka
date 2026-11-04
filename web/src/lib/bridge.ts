@@ -5,6 +5,8 @@ export interface Settings {
   aniListClientId: string | null;
   isLoggedIn: boolean;
   playerPath: string | null;
+  /** The bundled Ruruka player, or the user's own mpv with their config. */
+  playerKind: PlayerKind;
   libraryRoot: string | null;
   isSetupComplete: boolean;
   hasSkipWarning: boolean;
@@ -41,6 +43,8 @@ export interface Settings {
   songFileHostUrl: string;
 }
 
+export type PlayerKind = 'ruruka' | 'mpv';
+
 export type SettingsPatch = Partial<Omit<Settings, 'isLoggedIn'>>;
 
 export interface EpisodeFile {
@@ -67,6 +71,8 @@ export interface FolderLink {
 export interface PlayerStatus {
   mpvPath: string | null;
   isInstalled: boolean;
+  /** Installs without the bundled player have to use their own mpv. */
+  isBundledPlayerAvailable: boolean;
 }
 
 export interface PlaybackTarget {
@@ -74,6 +80,11 @@ export interface PlaybackTarget {
   episode: number;
   filePath: string;
   title: string;
+}
+
+export interface SharedFile {
+  fileSize: number;
+  extension: string;
 }
 
 export interface UpdateInfo {
@@ -97,6 +108,15 @@ interface BridgeApi {
   'player.detect': [void, PlayerStatus];
   'player.setPath': [{ path: string }, boolean];
   'player.play': [PlaybackTarget, boolean];
+  /** Moves this PC's player toward the host's position during a synced session. */
+  'player.followHost': [{ positionSeconds: number; isPaused: boolean }, boolean];
+  'player.releaseFromHost': [void, boolean];
+  /** Host side: shares the file its player opened; a friend can never name a path. */
+  'stream.share': [void, SharedFile];
+  'stream.stopSharing': [void, boolean];
+  /** Friend side: opens the local address fed by the UI and plays it. */
+  'stream.play': [{ mediaId: number; episode: number; title: string; fileSize: number; extension: string }, boolean];
+  'stream.closeViewer': [void, boolean];
   'shell.openUrl': [{ url: string }, boolean];
   'shell.openPath': [{ path: string }, boolean];
   'shell.pickFolder': [{ title?: string }, string | null];
@@ -121,6 +141,10 @@ export interface BridgeEvents {
   'player.watched': { mediaId: number; episode: number; title: string };
   /** Sent at most every 15 s while mpv plays. */
   'player.progress': { mediaId: number; episode: number; positionSeconds: number; durationSeconds: number };
+  /** Exact playback state, on pause, after a seek and every 5 s. */
+  'player.sync': { mediaId: number; episode: number; positionSeconds: number; durationSeconds: number; isPaused: boolean };
+  /** The player reads these bytes of a stream: answer through `deliverStreamChunk`. */
+  'stream.chunkNeeded': { requestId: string; offset: number; length: number };
   /** The episode reached its end; with isPlayerKeptOpen, mpv stays open on the last frame. */
   'player.ended': { mediaId: number; episode: number };
   'player.closed': { mediaId: number; episode: number; watchedRatio: number };
@@ -170,6 +194,22 @@ export function invoke<M extends Method>(
     pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
     webview.postMessage({ id, method, params: params[0] ?? {} });
   });
+}
+
+// <-- Des octets bruts passeraient en base64 par le pont : ces deux appels vont à une adresse que le programme intercepte -->
+const streamBytesUrl = 'https://stream.ruruka';
+
+/** Host side: reads bytes of the shared file, without any network. */
+export async function readSharedChunk(offset: number, length: number): Promise<ArrayBuffer> {
+  const response = await fetch(`${streamBytesUrl}/read?offset=${offset}&length=${length}`);
+  if (!response.ok) throw new Error('Impossible de lire le fichier partagé.');
+  return response.arrayBuffer();
+}
+
+/** Friend side: gives the player the bytes it asked for. A raw buffer carries no content type, so no preflight is sent. */
+export async function deliverStreamChunk(requestId: string, bytes: ArrayBuffer): Promise<void> {
+  const response = await fetch(`${streamBytesUrl}/chunk?requestId=${requestId}`, { method: 'POST', body: bytes });
+  if (!response.ok) throw new Error('Le lecteur n’a pas reçu la vidéo.');
 }
 
 /** Subscribes to a host event; returns the unsubscribe function. */

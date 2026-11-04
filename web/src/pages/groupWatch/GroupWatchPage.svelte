@@ -39,8 +39,8 @@
       <section class="card" style:--accent="var(--colorStrawberry)">
         <h2 class="note-label">Tu partages l’épisode</h2>
         <p>
-          Ouvre une séance et donne le code à tes amis. Lance l’épisode dans mpv et partage la fenêtre sur Discord : chez eux, Ruruka fait
-          comme s’ils le regardaient dans leur propre mpv.
+          Ouvre une séance et donne le code à tes amis. Ensuite, choisis comment ils regardent : ton partage d’écran, leur propre fichier en
+          même temps que toi, ou un flux direct depuis ton PC.
         </p>
         <button class="btn btn-primary" type="button" disabled={groupWatch.isConnecting} onclick={open}>Ouvrir une séance</button>
       </section>
@@ -48,7 +48,7 @@
       <!-- Rejoindre avec un code -->
       <section class="card" style:--accent="var(--colorSky)">
         <h2 class="note-label">Un ami partage l’épisode</h2>
-        <p>Entre le code qu’il t’a donné : ta liste avance et ton profil en direct suit l’épisode jusqu’à la fin de la séance.</p>
+        <p>Entre le code reçu : ta liste avance et ton profil en direct suit l’épisode jusqu’à la fin de la séance.</p>
         <form onsubmit={join}>
           <input class="input code" placeholder="XXXXX-XXXXX" spellcheck="false" autocomplete="off" maxlength="16" bind:value={typedCode} />
           <button class="btn btn-secondary" type="submit" disabled={groupWatch.isConnecting || !typedCode.trim()}>Rejoindre</button>
@@ -58,7 +58,8 @@
   {/if}
 
   <p class="faint privacy">
-    La séance passe par un relais public : personne n’a de port à ouvrir. Ce qui y circule est chiffré avec le code, garde-le entre amis.
+    La séance passe par un relais public : personne n’a de port à ouvrir. Ce qui y circule est chiffré avec le code, garde-le entre amis. Le
+    flux, lui, passe directement entre vos deux PC : vous voyez alors l’adresse IP l’un de l’autre.
   </p>
 </div>
 

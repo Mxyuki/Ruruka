@@ -7,6 +7,7 @@ using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Manga;
 using Ruruka.Desktop.Player;
 using Ruruka.Desktop.Settings;
+using Ruruka.Desktop.Streaming;
 using Ruruka.Desktop.Updates;
 using Ruruka.Desktop.Windowing;
 
@@ -265,7 +266,7 @@ internal sealed class MainForm : Form
         ApplyTheme();
 
         var bridge = new BridgeHost(SynchronizationContext.Current!);
-        bridge.Attach(core, CreateRouter(bridge));
+        bridge.Attach(core, CreateRouter(core, bridge));
         _bridge = bridge;
 
         if (isDev)
@@ -277,15 +278,19 @@ internal sealed class MainForm : Form
         core.Navigate(AppOrigin + "index.html");
     }
 
-    private BridgeRouter CreateRouter(IBridgeEvents events)
+    private BridgeRouter CreateRouter(CoreWebView2 core, IBridgeEvents events)
     {
         var router = new BridgeRouter();
+        var player = new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray));
+        var stream = new StreamService(player, events);
+        new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
         IBridgeModule[] modules =
         [
             new SettingsModule(_settings, OnSettingsChanged),
             new AuthModule(_settings, this, () => _environment!),
             new LibraryModule(_settings, _links),
-            new PlayerModule(new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray))),
+            new PlayerModule(player),
+            new StreamModule(stream),
             new ShellModule(this),
             new WindowModule(this, () => _uiFinishedSignal.TrySetResult()),
             new UpdateModule(new UpdateService(), QuitForUpdate),
@@ -294,6 +299,10 @@ internal sealed class MainForm : Form
         foreach (var module in modules) module.Register(router);
         return router;
     }
+
+    private static bool IsAppOrigin(string origin) =>
+        origin.Equals(AppOrigin.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+        || origin.Equals(DevServerUrl?.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
 
     // An app page only exists inside the window, so a browser could not open it; the UI sends those clicks to AniList itself.
     private static void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)

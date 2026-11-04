@@ -67,6 +67,10 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
         {
             throw new BridgeException("Langue de lecture invalide.");
         }
+        if (patch.PlayerKind is { } playerKind && !Player.PlayerChoice.IsValid(playerKind))
+        {
+            throw new BridgeException("Lecteur inconnu.");
+        }
         if (patch.Theme is { } theme && !AppTheme.IsKnown(theme))
         {
             throw new BridgeException("Thème inconnu.");

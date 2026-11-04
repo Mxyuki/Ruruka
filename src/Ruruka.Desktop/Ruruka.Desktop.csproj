@@ -11,7 +11,7 @@
     <RootNamespace>Ruruka.Desktop</RootNamespace>
     <ApplicationIcon>..\..\assets\ruruka.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.12.3</Version>
+    <Version>0.13.0</Version>
 
     <!-- Keep the host's footprint small: a single-threaded UI app needs neither server nor background GC. -->
     <ServerGarbageCollection>false</ServerGarbageCollection>
@@ -30,6 +30,8 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\assets\ruruka.ico" LogicalName="Ruruka.ico" />
     <Content Include="..\..\web\dist\**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\player\**\*" Link="player\config\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="..\..\.tools\mpv\mpv.exe" Link="player\mpv.exe" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" Condition="Exists('..\..\.tools\mpv\mpv.exe')" />
   </ItemGroup>
 
   <ItemGroup>

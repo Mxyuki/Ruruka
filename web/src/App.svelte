@@ -22,6 +22,7 @@
   import { mediaList } from './state/mediaList.svelte';
   import { playback } from './state/playback.svelte';
   import { session } from './state/session.svelte';
+  import { watchStream } from './state/watchStream.svelte';
   import { toasts } from './state/toasts.svelte';
   import { updates } from './state/updates.svelte';
 
@@ -58,6 +59,7 @@
     playback.init();
     liveAbout.init();
     groupWatch.init();
+    watchStream.init();
     void session.init();
     void updates.check();
     // <-- Avant de quitter : la séance est prévenue, le profil repasse au repos, puis le host peut fermer -->

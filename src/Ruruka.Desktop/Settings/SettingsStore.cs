@@ -24,6 +24,7 @@ public sealed class SettingsStore
     {
         AniListClientId = patch.AniListClientId ?? settings.AniListClientId,
         PlayerPath = patch.PlayerPath ?? settings.PlayerPath,
+        PlayerKind = patch.PlayerKind ?? settings.PlayerKind,
         LibraryRoot = patch.LibraryRoot ?? settings.LibraryRoot,
         IsSetupComplete = patch.IsSetupComplete ?? settings.IsSetupComplete,
         HasSkipWarning = patch.HasSkipWarning ?? settings.HasSkipWarning,

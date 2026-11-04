@@ -12,6 +12,8 @@
 | Secrets | Windows DPAPI (`ProtectedData`) | The AniList token is encrypted per Windows user at rest. |
 | Group watch relay | Public MQTT broker (`broker.emqx.io`) over secure WebSocket, a ~200-line MQTT 3.1.1 client in `api/watchRelay.ts` | Friends anywhere connect outward, so nobody opens a port and no Ruruka server has to run. MQTT gives retained messages (a late friend gets the current episode at once) and a last will (friends learn when the host drops). mqtt.js would add ~100 KB for the four packets used. |
 | Playback | mpv + JSON IPC over a named pipe | mpv reports exact playback position, which watch tracking needs. Other players don't expose this reliably. |
+| Ruruka player | The same mpv, shipped in `player/` with an isolated `--config-dir` and a Lua interface (`assets/player/scripts/ruruka-osc.lua`) | WebView2's `<video>` can't read what mpv reads (MKV, ASS…), and a web page can't be drawn over a native video surface in a normal WebView2 window. A script draws inside the video, so its bar really floats over it, and the IPC tracking stays the same. mpv is GPL: it stays a separate program, with its notice in `assets/player/licenses/`. `scripts/fetch-mpv.ps1` downloads a pinned, hash-checked build into `.tools/mpv`. |
+| Stream link | WebRTC data channel, set up through the sealed relay | Opens no port and encrypts end to end, with nothing to run online. WebView2 includes it, so there's no new dependency. STUN alone fails on some networks (see Stream below), and a TURN relay would add a server and its bandwidth bill. |
 
 Runtime memory levers already in place: workstation non-concurrent GC in the host,
 WebView2 `MemoryUsageTargetLevel.Low` while minimized, pages loaded on demand, lazy images,
@@ -70,7 +72,8 @@ src/Ruruka.Desktop/          C# host
   Settings/                  settings.json persistence + token encryption
   Auth/                      AniList OAuth window
   Library/                   folder scanning, filename parsing, folder ↔ media links
-  Player/                    mpv discovery (MpvLocator), process + IPC (MpvSession), watched-time maths (WatchTracker)
+  Player/                    mpv discovery (MpvLocator), bundled player (PlayerChoice), process + IPC (MpvSession), watched-time maths (WatchTracker), host following (SyncCorrection)
+  Streaming/                 group watch stream: shared file + local address (StreamService), mpv's HTTP side (LoopbackStreamServer), bytes to the UI (StreamResources)
   Windowing/                 Windows 11 title-bar theming (DWM), tray icon, startup with Windows (StartupRegistration)
   Updates/                   GitHub release check + installer download (UpdateService)
   Manga/                     read-only gateway to the manga site API chosen in Settings (MangaSiteClient): allow-listed paths, ≤ 4 requests/s
@@ -115,6 +118,9 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `library.scan` | Scan the library root, return folders + parsed episodes |
 | `library.getLinks` / `library.setLink` / `library.removeLink` | Folder ↔ media links |
 | `player.detect` / `player.setPath` / `player.play` | Find or pick mpv, launch an episode with tracking |
+| `player.followHost` / `player.releaseFromHost` | Keep this PC's player on the host's position, or stop |
+| `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
+| `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `shell.openUrl` | Open an http(s) link in the default browser |
 | `shell.openPath` | Open a folder in Explorer or a video in its default app (nothing else, by design) |
 | `shell.pickFolder` / `shell.pickFile` | Native dialogs |
@@ -128,6 +134,8 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.started` | `{ mediaId, episode }` |
 | `player.watched` | `{ mediaId, episode }`. Fired once the episode counts as watched (see Watch tracking) |
 | `player.progress` | `{ mediaId, episode, positionSeconds, durationSeconds }`. At most every 15 s while mpv plays, plus once as soon as the duration is known |
+| `player.sync` | `{ mediaId, episode, positionSeconds, durationSeconds, isPaused }`. On pause, after a seek and every 5 s, driven by mpv's own position updates |
+| `stream.chunkNeeded` | `{ requestId, offset, length }`. mpv reads these bytes of a stream; the UI answers on `stream.ruruka/chunk` |
 | `player.ended` | `{ mediaId, episode }`. The episode reached its end (mpv's `eof-reached`); with « garder mpv ouvert », mpv stays on the last frame instead of closing |
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
 | `window.closing` | `{}`. The app is really quitting; the UI answers with `window.readyToQuit` (the host waits 5 s at most) |
@@ -237,6 +245,22 @@ to reconnect, and only a closed session (`ended`, also sent when the app quits) 
 connection is retried 5 times with the same code. The topic is an HKDF hash of the code and every
 message is AES-GCM sealed with a key derived from it, so the public broker (where anyone can list topics)
 can neither read nor forge session messages.
+
+**Group watch modes.** The host picks how friends watch (`HostState.mode`): `screen` (shared elsewhere, as above), `files` or `stream`.
+In the last two, `player.sync` goes out on the non-retained `sync` channel, and a friend who follows the host passes each point to
+`player.followHost`. `SyncCorrection` leaves a drift under 0.2 s alone, plays at ±5 % up to 1.5 s, and seeks past that; the host
+leads, so a friend's own pause or seek gets corrected. `files` plays the friend's copy through `playback.playShared`, and
+`syncOffsetSeconds` covers releases with another timing. When the file is open, the friend's own mpv does the watch tracking.
+
+**Stream.** `state/watchStream.svelte.ts` asks the host's agreement on the `signal` channel, then `api/streamPeer.ts` opens one
+WebRTC data channel per friend. The offers travel sealed, so the relay can't get between the two PCs. The path of a byte:
+mpv → `LoopbackStreamServer` (127.0.0.1, random port and 256-bit token, Host header checked) → `stream.chunkNeeded` → the data
+channel → the host's UI → `stream.ruruka/read`, then back through `stream.ruruka/chunk`. That address is a WebView2 interception,
+not a socket: base64 over the JSON bridge would be slower, and the host opens nothing. A request carries a `fileKey`, so it can't
+read the next episode, and `lib/streamWindow.ts` refuses bytes more than about 3 minutes past the host's position, apart from the
+index areas at both ends of the file. Bytes stay in mpv's memory cache. The original file travels as is, so nothing is transcoded,
+and each friend picks among the file's own subtitles. Subtitles in separate `.ass` files next to the video are not sent, and burned-in
+ones can't be removed. Links fail on some networks (both sides behind strict NAT): the friend is told to use the screen share.
 
 **Airing countdowns** are computed from `airingAt` at render time (`formatCountdown`), not from
 AniList's `timeUntilAiring` snapshot, and each visit to the home page reloads the anime list when an

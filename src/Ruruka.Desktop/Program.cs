@@ -14,8 +14,8 @@ internal static class Program
     private static void Main(string[] args)
     {
         // <-- Une seule instance : relancer Ruruka réaffiche la fenêtre rangée dans la zone de notification -->
-        using var instanceMutex = new Mutex(true, InstanceMutexName, out var isFirstInstance);
-        using var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+        using var instanceMutex = new Mutex(true, InstanceMutexName + AppPaths.DevInstanceSuffix, out var isFirstInstance);
+        using var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName + AppPaths.DevInstanceSuffix);
         if (!isFirstInstance)
         {
             showEvent.Set();

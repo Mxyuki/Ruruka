@@ -16,7 +16,7 @@ Ruruka est une petite application Windows pour suivre tes anime et tes manga sur
 à résoudre.
 
 Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
-[mpv](https://mpv.io) et **coche l'épisode toute seule** quand tu arrives à 85 % (réglable).
+son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** quand tu arrives à 85 % (réglable).
 
 <table>
   <tr>
@@ -35,9 +35,12 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
   les sorties à venir et ce que regardent tes amis.
 - **Ton dossier d'anime relié à AniList.** Chaque sous-dossier est reconnu tout seul (même les
   collections rangées par saison). Si Ruruka se trompe, tu corriges le lien en deux clics.
-- **Lecture dans mpv et progression automatique.** Arrivé à 85 % de l'épisode, ta liste se met à jour. Tu peux passer les génériques tant que tu as vraiment vu la moitié de l'épisode ; les deux seuils se règlent.
+- **Lecteur Ruruka intégré.** Il lit les mêmes formats que mpv, avec une barre simple qui s'efface pendant
+  l'épisode : temps restant, chapitres, sous-titres, audio, vitesse et décalages. Si tu préfères
+  ton mpv et sa configuration, tu le choisis dans les réglages.
+- **Lecture et progression automatique.** Arrivé à 85 % de l'épisode, ta liste se met à jour. Tu peux passer les génériques tant que tu as vraiment vu la moitié de l'épisode ; les deux seuils se règlent.
   Elle ne recule jamais : si tu revois un vieil épisode, ta progression ne bouge pas.
-- **Une seule fenêtre mpv pour toute la soirée.** À la fin d'un épisode, mpv reste ouvert ; lance
+- **Une seule fenêtre pour toute la soirée.** À la fin d'un épisode, le lecteur reste ouvert ; lance
   le suivant et il s'ouvre dans la même fenêtre, avec le même suivi. Pratique pour regarder entre
   amis en partage d'écran sur Discord.
 - **Un petit avertissement** si tu lances l'épisode 20 alors que tu en es au 16. Ruruka te
@@ -92,8 +95,10 @@ Elle relie aussi ton dossier d'anime à AniList, lance les épisodes dans
 - **Partager une fiche.** Sur la page d'un anime, le bouton de partage dessine une jolie carte
   (jaquette, progression, ta note) à copier ou enregistrer en image.
 - **Séance entre amis.** Dans l'onglet « Séance », ouvre une séance et donne le code à tes
-  amis : pendant que tu partages mpv sur Discord, leur Ruruka suit l'épisode comme s'il tournait
-  chez eux (liste mise à jour, profil en direct). Rien à configurer, aucun port à ouvrir.
+  amis, puis choisis comment ils regardent : ton partage d'écran sur Discord, leur propre fichier
+  synchronisé avec le tien, ou un flux direct depuis ton PC, où chacun choisit ses sous-titres.
+  Leur liste et leur profil en direct suivent. Rien à configurer, aucun port à ouvrir. Le flux passe
+  directement entre vos PC : vos adresses IP se voient, et certaines connexions le bloquent.
 - **Carnet de jour ou de nuit.** Thème clair, sombre, qui suit Windows, ou qui change selon
   l'heure (carnet de jour et carnet de nuit aux heures que tu choisis).
 - **Listes perso** : ajoute un anime à tes listes personnalisées depuis sa fiche, ou crées-en
@@ -135,9 +140,9 @@ Ruruka te guide en trois étapes.
 3. Copie l'**ID** du client (un nombre), colle-le dans Ruruka et clique sur
    **Se connecter avec AniList**.
 
-**II. Le lecteur vidéo.** Installe [mpv](https://mpv.io/installation/) si tu veux lancer tes
-épisodes depuis Ruruka. Il est trouvé tout seul (PATH, Scoop, WinGet, Chocolatey,
-Program Files), sinon tu peux indiquer où se trouve `mpv.exe`.
+**II. Le lecteur vidéo.** Le lecteur Ruruka est prêt tout de suite. Pour utiliser ton
+[mpv](https://mpv.io/installation/), choisis « Mon mpv » : il est trouvé tout seul (PATH, Scoop,
+WinGet, Chocolatey, Program Files), sinon tu peux indiquer où se trouve `mpv.exe`.
 
 **III. Ton dossier d'anime** (facultatif). Choisis le dossier qui contient tes anime, avec un
 sous-dossier par série :

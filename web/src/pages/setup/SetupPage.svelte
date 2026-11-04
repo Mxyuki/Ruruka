@@ -49,7 +49,7 @@
       <AccountConnect />
     {:else if step === 'player'}
       <h2>Le lecteur vidéo</h2>
-      <p class="lead">Les épisodes s'ouvrent dans mpv. Ta liste se met à jour quand tu as vu 80 % d'un épisode.</p>
+      <p class="lead">Choisis où s'ouvrent les épisodes. Ta liste se met à jour quand tu as vu 80 % d'un épisode.</p>
       <PlayerSetup />
     {:else}
       <h2>Ton dossier d'anime</h2>

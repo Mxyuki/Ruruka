@@ -2,6 +2,7 @@
   import { mediaPath } from '../../lib/routes';
   import { groupWatch } from '../../state/groupWatch.svelte';
   import { playback } from '../../state/playback.svelte';
+  import FriendWatchOptions from './FriendWatchOptions.svelte';
   import SharedEpisodeCard from './SharedEpisodeCard.svelte';
 
   const remote = $derived(groupWatch.remote);
@@ -21,8 +22,11 @@
     <a href="#{mediaPath(remote.shared.media.id)}">
       <SharedEpisodeCard media={remote.shared.media} shared={remote.shared} />
     </a>
-    {#if isOwnMpvPlaying}
-      <p class="warning">Ton propre mpv joue un épisode : il passe avant la séance tant qu’il est ouvert.</p>
+    <FriendWatchOptions />
+    {#if groupWatch.following !== 'none'}
+      <p class="muted">Ton lecteur suit {remote.hostName} : c’est lui qui met en pause et avance.</p>
+    {:else if isOwnMpvPlaying}
+      <p class="warning">Ton propre lecteur joue un épisode : il passe avant la séance tant qu’il est ouvert.</p>
     {:else}
       <p class="muted">Ta liste avancera quand l’épisode comptera comme vu chez {remote.hostName}.</p>
     {/if}

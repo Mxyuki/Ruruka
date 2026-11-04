@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke, type PlayerStatus } from '../lib/bridge';
+  import { invoke, type PlayerKind, type PlayerStatus } from '../lib/bridge';
   import { session } from '../state/session.svelte';
   import { toasts } from '../state/toasts.svelte';
   import Icon from './Icon.svelte';
@@ -8,7 +8,22 @@
   let status = $state<PlayerStatus | null>(null);
   let isChecking = $state(false);
 
+  const kinds: { kind: PlayerKind; title: string; description: string }[] = [
+    { kind: 'ruruka', title: 'Lecteur Ruruka', description: 'Prêt tout de suite, avec une barre simple qui s’efface pendant l’épisode.' },
+    { kind: 'mpv', title: 'Mon mpv', description: 'Ton mpv installé, avec ta configuration et tes scripts.' },
+  ];
+
+  const playerKind = $derived(session.settings?.playerKind ?? 'ruruka');
+
   onMount(detect);
+
+  async function choosePlayer(kind: PlayerKind) {
+    try {
+      await session.updateSettings({ playerKind: kind });
+    } catch (error) {
+      toasts.error(error, 'Impossible de changer de lecteur');
+    }
+  }
 
   async function detect() {
     isChecking = true;
@@ -34,7 +49,31 @@
   }
 </script>
 
-{#if status?.isInstalled}
+<div class="kinds" role="radiogroup" aria-label="Lecteur vidéo">
+  {#each kinds as { kind, title, description } (kind)}
+    <button class="kind" class:is-active={playerKind === kind} type="button" role="radio" aria-checked={playerKind === kind} onclick={() => choosePlayer(kind)}>
+      <strong>{title}</strong>
+      <span>{description}</span>
+    </button>
+  {/each}
+</div>
+
+{#if playerKind === 'ruruka'}
+  {#if status && !status.isBundledPlayerAvailable}
+    <div class="status is-missing">
+      <Icon name="download" />
+      <div>
+        <strong>Le lecteur Ruruka manque dans cette installation</strong>
+        <p>Réinstalle Ruruka, ou choisis ton propre mpv en attendant.</p>
+      </div>
+    </div>
+  {:else if status}
+    <div class="status is-ok">
+      <Icon name="check" />
+      <div><strong>Le lecteur Ruruka est prêt !</strong></div>
+    </div>
+  {/if}
+{:else if status?.isInstalled}
   <div class="status is-ok">
     <Icon name="check" />
     <div>
@@ -67,6 +106,40 @@
 {/if}
 
 <style>
+  .kinds {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space2);
+    margin-bottom: var(--space3);
+  }
+
+  .kind {
+    display: grid;
+    align-content: start;
+    gap: var(--space1);
+    padding: var(--space3);
+    border: var(--outlineThin);
+    border-radius: var(--radiusSticker);
+    background: var(--colorPaper);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .kind:hover {
+    background: var(--colorSunken);
+  }
+
+  .kind.is-active {
+    background: var(--colorBlond);
+    box-shadow: var(--stickerShadow);
+  }
+
+  .kind span {
+    font-size: var(--fontSizeSm);
+  }
+
   .status {
     display: flex;
     align-items: flex-start;

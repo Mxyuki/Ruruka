@@ -10,6 +10,9 @@ public sealed record AppSettings
 
     public string? PlayerPath { get; init; }
 
+    /// <summary>"ruruka" or "mpv"; null until the user chooses, see <see cref="Player.PlayerChoice"/>.</summary>
+    public string? PlayerKind { get; init; }
+
     public string? LibraryRoot { get; init; }
 
     public bool IsSetupComplete { get; init; }
@@ -68,6 +71,7 @@ public sealed record AppSettings
         AniListClientId,
         ProtectedToken is not null,
         PlayerPath,
+        Player.PlayerChoice.Resolve(PlayerKind, PlayerPath),
         LibraryRoot,
         IsSetupComplete,
         HasSkipWarning,
@@ -94,6 +98,7 @@ public sealed record PublicSettings(
     string? AniListClientId,
     bool IsLoggedIn,
     string? PlayerPath,
+    string PlayerKind,
     string? LibraryRoot,
     bool IsSetupComplete,
     bool HasSkipWarning,
@@ -119,6 +124,7 @@ public sealed record SettingsPatch
 {
     public string? AniListClientId { get; init; }
     public string? PlayerPath { get; init; }
+    public string? PlayerKind { get; init; }
     public string? LibraryRoot { get; init; }
     public bool? IsSetupComplete { get; init; }
     public bool? HasSkipWarning { get; init; }

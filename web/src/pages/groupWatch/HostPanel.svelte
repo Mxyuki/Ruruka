@@ -4,6 +4,8 @@
   import { playback } from '../../state/playback.svelte';
   import { toasts } from '../../state/toasts.svelte';
   import SharedEpisodeCard from './SharedEpisodeCard.svelte';
+  import StreamViewers from './StreamViewers.svelte';
+  import WatchModePicker from './WatchModePicker.svelte';
 
   const playing = $derived(playback.nowPlaying && !playback.nowPlaying.isRemote ? playback.nowPlaying : null);
 
@@ -32,13 +34,16 @@
     <p class="warning">Connexion au relais perdue, on la rétablit…</p>
   {/if}
 
+  <h3 class="note-label">Comment tes amis regardent</h3>
+  <WatchModePicker />
+
   <h3 class="note-label">À l’écran</h3>
   {#if playing && groupWatch.shared}
     <a href="#{mediaPath(playing.media.id)}">
       <SharedEpisodeCard media={playing.media} shared={groupWatch.shared} />
     </a>
   {:else}
-    <p class="muted">Lance un épisode dans mpv : tes amis le suivront dès qu’il démarre.</p>
+    <p class="muted">Lance un épisode : tes amis le suivront dès qu’il démarre.</p>
   {/if}
 
   <h3 class="note-label">Dans la séance · {groupWatch.friends.length}</h3>
@@ -50,6 +55,11 @@
     </ul>
   {:else}
     <p class="muted">Personne pour l’instant. Donne-leur le code !</p>
+  {/if}
+
+  {#if groupWatch.mode === 'stream'}
+    <h3 class="note-label">Flux</h3>
+    <StreamViewers />
   {/if}
 
   <button class="btn btn-danger" type="button" onclick={() => groupWatch.leave()}>Fermer la séance</button>
