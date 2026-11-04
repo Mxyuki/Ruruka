@@ -3,6 +3,7 @@
   import { groupWatch } from '../../state/groupWatch.svelte';
   import { playback } from '../../state/playback.svelte';
   import { toasts } from '../../state/toasts.svelte';
+  import SessionFriends from './SessionFriends.svelte';
   import SharedEpisodeCard from './SharedEpisodeCard.svelte';
   import StreamViewers from './StreamViewers.svelte';
   import WatchModePicker from './WatchModePicker.svelte';
@@ -47,15 +48,7 @@
   {/if}
 
   <h3 class="note-label">Dans la séance · {groupWatch.friends.length}</h3>
-  {#if groupWatch.friends.length}
-    <ul>
-      {#each groupWatch.friends as friend (friend.friendId)}
-        <li class="chip">{friend.name}</li>
-      {/each}
-    </ul>
-  {:else}
-    <p class="muted">Personne pour l’instant. Donne-leur le code !</p>
-  {/if}
+  <SessionFriends />
 
   {#if groupWatch.mode === 'stream'}
     <h3 class="note-label">Flux</h3>
@@ -101,14 +94,5 @@
 
   a {
     width: 100%;
-  }
-
-  ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 </style>

@@ -12,6 +12,7 @@
   import SectionOrderDialog from './SectionOrderDialog.svelte';
   import SitesCard from './SitesCard.svelte';
   import ThemeCard from './ThemeCard.svelte';
+  import UpdateCard from './UpdateCard.svelte';
 
   const scaleOptions: [number, string][] = [
     [0, 'Automatique'],
@@ -159,6 +160,8 @@
       <h2 class="note-label">Dossier d’anime</h2>
       <LibraryRootPicker />
     </section>
+
+    <UpdateCard />
   </div>
 
   <!-- Ruruka et sa glace tiennent compagnie pendant les réglages -->

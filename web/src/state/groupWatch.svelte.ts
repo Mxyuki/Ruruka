@@ -13,6 +13,9 @@ const stateChannel = 'state';
 const friendsChannel = 'friends';
 const syncChannel = 'sync';
 const signalChannel = 'signal';
+const controlChannel = 'control';
+/** The host's older points are still on their way when a friend acts: following them would undo the action for a moment. */
+const controlGraceMs = 1_500;
 /** A message older than this has stalled somewhere: it says nothing reliable about the delay. */
 const maxSyncLagSeconds = 3;
 const reconnectDelaysMs = [2_000, 5_000, 15_000, 30_000, 60_000];
@@ -50,6 +53,15 @@ interface SyncMessage extends SyncPoint {
   sentAt: number;
 }
 
+/** A friend's pause or seek, sent to the host. */
+interface ControlMessage {
+  friendId: string;
+  mediaId: number;
+  episode: number;
+  positionSeconds: number | null;
+  isPaused: boolean | null;
+}
+
 /** The episode on the host's mpv. */
 export interface SharedEpisode {
   mediaId: number;
@@ -71,6 +83,8 @@ interface HostState {
   shared: SharedEpisode | null;
   mode: WatchMode;
   stream: StreamedFile | null;
+  /** Friends allowed to pause and seek for everyone. */
+  controllerIds: string[];
 }
 
 interface FriendNotice {
@@ -91,6 +105,7 @@ export interface RemoteSession {
   shared: (SharedEpisode & { media: MediaSummary }) | null;
   mode: WatchMode;
   stream: StreamedFile | null;
+  controllerIds: string[];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -112,11 +127,21 @@ function asStreamedFile(value: unknown): StreamedFile | null {
 
 function asHostState(value: unknown): HostState | null {
   if (!isRecord(value)) return null;
-  const { status, hostName, connectionId, shared, mode, stream } = value;
+  const { status, hostName, connectionId, shared, mode, stream, controllerIds } = value;
   if (status !== 'playing' && status !== 'idle' && status !== 'lost' && status !== 'ended') return null;
   if (typeof hostName !== 'string' || typeof connectionId !== 'string') return null;
   const knownMode: WatchMode = mode === 'files' || mode === 'stream' ? mode : 'screen';
-  return { status, hostName, connectionId, shared: asSharedEpisode(shared), mode: knownMode, stream: asStreamedFile(stream) };
+  const knownControllerIds = Array.isArray(controllerIds) ? controllerIds.filter((id): id is string => typeof id === 'string') : [];
+  return { status, hostName, connectionId, shared: asSharedEpisode(shared), mode: knownMode, stream: asStreamedFile(stream), controllerIds: knownControllerIds };
+}
+
+function asControlMessage(value: unknown): ControlMessage | null {
+  if (!isRecord(value)) return null;
+  const { friendId, mediaId, episode, positionSeconds, isPaused } = value;
+  if (typeof friendId !== 'string' || typeof mediaId !== 'number' || typeof episode !== 'number') return null;
+  if (positionSeconds !== null && typeof positionSeconds !== 'number') return null;
+  if (isPaused !== null && typeof isPaused !== 'boolean') return null;
+  return { friendId, mediaId, episode, positionSeconds, isPaused };
 }
 
 function asSyncMessage(value: unknown): SyncMessage | null {
@@ -163,10 +188,13 @@ class GroupWatch {
   following = $state<FollowKind>('none');
   /** Friend side: seconds added to the host's position, for a release with a different timing. */
   syncOffsetSeconds = $state(0);
+  /** Host side: friends allowed to pause and seek for everyone. */
+  controllerIds = $state<string[]>([]);
 
   /** Host side: the stream's file, which changes with each episode. */
   streamedFile: StreamedFile | null = null;
   private lastSyncPoint: SyncPoint | null = null;
+  private ignoreHostUntil = 0;
   private streamHooks: StreamHooks | null = null;
   private room: RelayRoom | null = null;
   private connectionId = '';
@@ -181,6 +209,23 @@ class GroupWatch {
     return this.role === 'hosting' ? hostPeerId : this.friendId;
   }
 
+  /** Friend side: the host lets this PC pause and seek for everyone. */
+  get canControl(): boolean {
+    return this.remote?.controllerIds.includes(this.friendId) ?? false;
+  }
+
+  /** Host side: whether a friend may pause and seek for everyone. */
+  isController(friendId: string): boolean {
+    return this.controllerIds.includes(friendId);
+  }
+
+  /** Host side: gives a friend control of playback, or takes it back. */
+  setController(friendId: string, isAllowed: boolean): void {
+    const others = this.controllerIds.filter((id) => id !== friendId);
+    this.controllerIds = isAllowed ? [...others, friendId] : others;
+    void this.publishHostState();
+  }
+
   /** Connects the stream store, which depends on this one. */
   connectStream(hooks: StreamHooks): void {
     this.streamHooks = hooks;
@@ -192,6 +237,7 @@ class GroupWatch {
       if (this.role === 'hosting' && this.mode === 'stream') this.streamHooks?.onHostEpisodeStarted();
     });
     on('player.sync', (point) => this.handleOwnSyncPoint(point));
+    on('player.userControl', (control) => this.sendControl(control));
     on('player.progress', (position) => this.share({ ...position, isWatched: this.isSharing(position) && (this.shared?.isWatched ?? false) }));
     on('player.watched', (episode) => {
       if (this.shared && this.isSharing(episode)) this.share({ ...this.shared, isWatched: true });
@@ -280,7 +326,7 @@ class GroupWatch {
     try {
       this.room = await joinRelayRoom({
         code,
-        channels: role === 'hosting' ? [friendsChannel, signalChannel] : [stateChannel, syncChannel, signalChannel],
+        channels: role === 'hosting' ? [friendsChannel, signalChannel, controlChannel] : [stateChannel, syncChannel, signalChannel],
         lastWill:
           role === 'hosting'
             ? { channel: stateChannel, payload: this.hostState('lost'), isRetained: true }
@@ -333,6 +379,8 @@ class GroupWatch {
     this.mode = 'screen';
     this.streamedFile = null;
     this.syncOffsetSeconds = 0;
+    this.controllerIds = [];
+    this.ignoreHostUntil = 0;
   }
 
   private routeMessage(role: Exclude<GroupWatchRole, 'idle'>, message: RelayMessage): void {
@@ -344,6 +392,11 @@ class GroupWatch {
     if (message.channel === syncChannel) {
       const point = asSyncMessage(message.payload);
       if (point) this.applySyncPoint(point);
+      return;
+    }
+    if (message.channel === controlChannel) {
+      const control = asControlMessage(message.payload);
+      if (control) this.applyControl(control);
       return;
     }
     if (role === 'hosting') this.handleFriendNotice(message);
@@ -366,10 +419,29 @@ class GroupWatch {
     this.room?.publish(syncChannel, message, false).catch((error: unknown) => toasts.error(error, 'Impossible de synchroniser la séance'));
   }
 
+  private sendControl({ mediaId, episode, positionSeconds, isPaused }: BridgeEvents['player.userControl']): void {
+    if (this.role !== 'joined' || this.following === 'none' || !this.canControl) return;
+    this.ignoreHostUntil = Date.now() + controlGraceMs;
+    const hostPosition = positionSeconds === null ? null : Math.max(0, positionSeconds - this.syncOffsetSeconds);
+    const message: ControlMessage = { friendId: this.friendId, mediaId, episode, positionSeconds: hostPosition, isPaused };
+    this.room?.publish(controlChannel, message, false).catch((error: unknown) => toasts.error(error, 'Impossible de piloter la séance'));
+  }
+
+  // <-- Hôte : l'action d'un ami autorisé s'applique ici, puis repart vers tout le monde comme un point de synchro -->
+  private applyControl({ friendId, mediaId, episode, positionSeconds, isPaused }: ControlMessage): void {
+    if (this.role !== 'hosting' || this.mode === 'screen' || !this.isController(friendId)) return;
+    if (!this.shared || !this.isSharing({ mediaId, episode })) return;
+    if (isPaused !== null) {
+      const name = this.friends.find((friend) => friend.friendId === friendId)?.name ?? 'Un ami';
+      toasts.show(isPaused ? `${name} a mis en pause.` : `${name} a relancé l’épisode.`, 'info');
+    }
+    invoke('player.applyControl', { positionSeconds, isPaused }).catch((error: unknown) => toasts.error(error, 'Impossible d’appliquer l’action de ton ami'));
+  }
+
   // <-- Ami : le message a voyagé, donc l'hôte a déjà avancé d'autant s'il n'est pas en pause -->
   private applySyncPoint(point: SyncMessage): void {
     const current = playback.nowPlaying;
-    if (this.following === 'none' || !current || current.isRemote) return;
+    if (this.following === 'none' || !current || current.isRemote || Date.now() < this.ignoreHostUntil) return;
     if (current.media.id !== point.mediaId || current.episode !== point.episode) return;
     const lagSeconds = point.isPaused ? 0 : Math.min(maxSyncLagSeconds, Math.max(0, (Date.now() - point.sentAt) / 1000));
     const positionSeconds = Math.max(0, point.positionSeconds + lagSeconds + this.syncOffsetSeconds);
@@ -393,6 +465,7 @@ class GroupWatch {
       shared: this.shared,
       mode: this.mode,
       stream: this.streamedFile,
+      controllerIds: this.controllerIds,
     };
   }
 
@@ -420,6 +493,7 @@ class GroupWatch {
     if (notice.type === 'leave') {
       if (!isNew) toasts.show(`${notice.name} a quitté la séance.`, 'info');
       this.friends = others;
+      if (this.isController(notice.friendId)) this.setController(notice.friendId, false);
       return;
     }
     if (isNew) toasts.show(`${notice.name} a rejoint la séance !`, 'info');
@@ -448,7 +522,7 @@ class GroupWatch {
     }
     const previous = this.remote?.shared;
     if (state.status !== 'playing' || !state.shared) {
-      this.remote = { hostName: state.hostName, status: state.status, shared: null, mode: state.mode, stream: state.stream };
+      this.remote = { hostName: state.hostName, status: state.status, shared: null, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds };
       this.stopFollowing();
       return;
     }
@@ -456,7 +530,7 @@ class GroupWatch {
     const shared = state.shared;
     const media = previous?.mediaId === shared.mediaId ? previous.media : await mediaFor(shared.mediaId);
     if (this.role !== 'joined') return;
-    this.remote = { hostName: state.hostName, status: state.status, shared: { ...shared, media }, mode: state.mode, stream: state.stream };
+    this.remote = { hostName: state.hostName, status: state.status, shared: { ...shared, media }, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds };
     await this.followNextEpisode(previous, media);
     if (!playback.followRemote(media, shared.episode)) return;
     liveAbout.trackPosition({ mediaId: shared.mediaId, episode: shared.episode, positionSeconds: shared.positionSeconds, durationSeconds: shared.durationSeconds });

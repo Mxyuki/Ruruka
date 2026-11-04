@@ -17,6 +17,9 @@ public sealed record PlaybackProgress(int MediaId, int Episode, double PositionS
 /// <summary>Payload of "player.sync": the exact playback state, sent on pause, after a seek and every <see cref="MpvSession.SyncInterval"/>.</summary>
 public sealed record PlaybackSyncPoint(int MediaId, int Episode, double PositionSeconds, double DurationSeconds, bool IsPaused);
 
+/// <summary>Payload of "player.userControl": the person at this player paused or seeked, as opposed to a sync correction.</summary>
+public sealed record PlaybackUserControl(int MediaId, int Episode, double? PositionSeconds, bool? IsPaused);
+
 /// <summary>How to start mpv: which executable, and the bundled Ruruka config when it is the bundled player.</summary>
 internal sealed record MpvLaunch(string ExecutablePath, string? ConfigDirectory);
 
@@ -34,7 +37,11 @@ internal sealed class MpvSession
     // A friend corrects against each point, so this is also how long a small drift can last.
     internal static readonly TimeSpan SyncInterval = TimeSpan.FromSeconds(5);
 
+    // mpv pauses by itself on the last frame of a kept-open file; that isn't someone's decision.
+    private const double EpisodeEndMarginSeconds = 2;
+
     private const int DurationRequestId = 1;
+    private const int PositionRequestId = 2;
 
     private readonly IBridgeEvents _events;
     private readonly Process _process;
@@ -54,6 +61,11 @@ internal sealed class MpvSession
     private bool _isPaused;
     private bool _isPositionKnown;
     private double _appliedSpeed = 1;
+
+    // Changes Ruruka asked for itself, so they aren't mistaken for the person's own and echoed back to the session.
+    private bool? _expectedPause;
+    private bool _isOwnSeekPending;
+    private bool _isUserSeekPending;
 
     // The host's latest position during a synced session, applied once this mpv knows its own position.
     private (double PositionSeconds, bool IsPaused)? _hostPosition;
@@ -110,6 +122,7 @@ internal sealed class MpvSession
             (previousTarget, previousTracker) = (_target, _tracker);
             SwitchEpisode(target, tracker);
             _pendingLoads++;
+            _isPaused = false;
         }
 
         // <-- La pause survit au changement de fichier, et mpv se met en pause à la fin d'un épisode gardé ouvert -->
@@ -145,6 +158,17 @@ internal sealed class MpvSession
         }
     }
 
+    /// <summary>Applies a friend's pause or seek on the host's player; friends then follow its next sync point.</summary>
+    public void ApplyControl(double? positionSeconds, bool? isPaused)
+    {
+        lock (_gate)
+        {
+            if (_hasExited || !_isPositionKnown) return;
+            if (isPaused is { } pause) SetPause(pause);
+            if (positionSeconds is { } position) SeekOwn(position);
+        }
+    }
+
     /// <summary>Stops following the host and returns to normal speed.</summary>
     public void ReleaseFromHost()
     {
@@ -159,10 +183,23 @@ internal sealed class MpvSession
     {
         if (_hostPosition is not { } host) return;
         _hostPosition = null;
-        if (host.IsPaused != _isPaused) _ = TrySendAsync("set_property", "pause", host.IsPaused);
+        SetPause(host.IsPaused);
         var correction = SyncCorrection.Decide(_lastPosition, host.PositionSeconds, host.IsPaused);
         SetSpeed(correction.Speed);
-        if (correction.SeekToSeconds is { } seekTo) _ = TrySendAsync("seek", seekTo, "absolute+exact");
+        if (correction.SeekToSeconds is { } seekTo) SeekOwn(seekTo);
+    }
+
+    private void SetPause(bool isPaused)
+    {
+        if (isPaused == _isPaused) return;
+        _expectedPause = isPaused;
+        _ = TrySendAsync("set_property", "pause", isPaused);
+    }
+
+    private void SeekOwn(double positionSeconds)
+    {
+        _isOwnSeekPending = true;
+        _ = TrySendAsync("seek", positionSeconds, "absolute+exact");
     }
 
     private void SetSpeed(double speed)
@@ -179,6 +216,9 @@ internal sealed class MpvSession
         _lastPosition = 0;
         _hasReachedEnd = false;
         _isPositionKnown = false;
+        _expectedPause = null;
+        _isOwnSeekPending = false;
+        _isUserSeekPending = false;
         _sinceProgress.Reset();
         _sinceSync.Reset();
     }
@@ -270,11 +310,7 @@ internal sealed class MpvSession
         {
             if (root.TryGetProperty("request_id", out var requestId))
             {
-                var isDurationReply = requestId.GetInt32() == DurationRequestId && _pendingLoads == 0;
-                if (isDurationReply && root.TryGetProperty("data", out var duration) && duration.ValueKind == JsonValueKind.Number)
-                {
-                    SetDuration(duration.GetDouble());
-                }
+                HandleReply(requestId.GetInt32(), root);
                 return;
             }
             if (!root.TryGetProperty("event", out var eventName)) return;
@@ -286,11 +322,31 @@ internal sealed class MpvSession
                 case "property-change" when _pendingLoads == 0:
                     HandlePropertyChange(root);
                     break;
+                case "seek" when _pendingLoads == 0 && !_isOwnSeekPending:
+                    _isUserSeekPending = true;
+                    break;
                 case "playback-restart" when _pendingLoads == 0:
-                    ReportSync();
+                    _ = TrySendMessageAsync(new { command = new object[] { "get_property", "time-pos" }, request_id = PositionRequestId });
                     break;
             }
         }
+    }
+
+    private void HandleReply(int requestId, JsonElement root)
+    {
+        if (_pendingLoads > 0 || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Number) return;
+        if (requestId == DurationRequestId) SetDuration(data.GetDouble());
+        if (requestId == PositionRequestId) ReportPositionAfterSeek(data.GetDouble());
+    }
+
+    // <-- « time-pos » peut arriver après la reprise : on redemande la position pour que les amis reçoivent la bonne -->
+    private void ReportPositionAfterSeek(double position)
+    {
+        _lastPosition = position;
+        ReportSync();
+        if (_isUserSeekPending) _events.Emit("player.userControl", new PlaybackUserControl(_target.MediaId, _target.Episode, position, null));
+        _isUserSeekPending = false;
+        _isOwnSeekPending = false;
     }
 
     // mpv only reports a property when its value changes, so two episodes of the same length would leave the duration unknown.
@@ -316,9 +372,22 @@ internal sealed class MpvSession
                 ReportEnd();
                 break;
             case "pause" when data.ValueKind is JsonValueKind.True or JsonValueKind.False:
-                _isPaused = data.GetBoolean();
-                ReportSync();
+                HandlePause(data.GetBoolean());
                 break;
+        }
+    }
+
+    private void HandlePause(bool isPaused)
+    {
+        var hasChanged = isPaused != _isPaused;
+        var isOwnChange = _expectedPause == isPaused;
+        var isAtEnd = _tracker.DurationSeconds > 0 && _tracker.DurationSeconds - _lastPosition < EpisodeEndMarginSeconds;
+        _expectedPause = null;
+        _isPaused = isPaused;
+        ReportSync();
+        if (hasChanged && !isOwnChange && !isAtEnd)
+        {
+            _events.Emit("player.userControl", new PlaybackUserControl(_target.MediaId, _target.Episode, null, isPaused));
         }
     }
 

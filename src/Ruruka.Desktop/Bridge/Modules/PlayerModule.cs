@@ -22,6 +22,11 @@ internal sealed class PlayerModule(PlayerService player) : IBridgeModule
             player.FollowHost(point.PositionSeconds, point.IsPaused);
             return Task.FromResult(true);
         });
+        router.Register<ControlParams, bool>("player.applyControl", control =>
+        {
+            player.ApplyControl(control.PositionSeconds, control.IsPaused);
+            return Task.FromResult(true);
+        });
         router.Register("player.releaseFromHost", () =>
         {
             player.ReleaseFromHost();
@@ -32,4 +37,6 @@ internal sealed class PlayerModule(PlayerService player) : IBridgeModule
     private sealed record PathParams(string Path);
 
     private sealed record SyncPoint(double PositionSeconds, bool IsPaused);
+
+    private sealed record ControlParams(double? PositionSeconds, bool? IsPaused);
 }

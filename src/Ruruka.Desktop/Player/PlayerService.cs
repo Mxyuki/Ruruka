@@ -54,6 +54,8 @@ public sealed class PlayerService(SettingsStore settings, IBridgeEvents events)
 
     public void ReleaseFromHost() => _session?.ReleaseFromHost();
 
+    public void ApplyControl(double? positionSeconds, bool? isPaused) => _session?.ApplyControl(positionSeconds, isPaused);
+
     private async Task StartAsync(PlaybackTarget target, IReadOnlyDictionary<string, string> options, string? localFilePath)
     {
         var launch = ChooseLaunch();

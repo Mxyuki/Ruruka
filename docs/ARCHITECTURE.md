@@ -119,6 +119,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `library.getLinks` / `library.setLink` / `library.removeLink` | Folder ↔ media links |
 | `player.detect` / `player.setPath` / `player.play` | Find or pick mpv, launch an episode with tracking |
 | `player.followHost` / `player.releaseFromHost` | Keep this PC's player on the host's position, or stop |
+| `player.applyControl` | Host: apply the pause or seek of a friend allowed to control playback |
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `shell.openUrl` | Open an http(s) link in the default browser |
@@ -135,6 +136,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.watched` | `{ mediaId, episode }`. Fired once the episode counts as watched (see Watch tracking) |
 | `player.progress` | `{ mediaId, episode, positionSeconds, durationSeconds }`. At most every 15 s while mpv plays, plus once as soon as the duration is known |
 | `player.sync` | `{ mediaId, episode, positionSeconds, durationSeconds, isPaused }`. On pause, after a seek and every 5 s, driven by mpv's own position updates |
+| `player.userControl` | `{ mediaId, episode, positionSeconds, isPaused }`. The person at this player paused or seeked; changes Ruruka asked for itself don't count. One value is null |
 | `stream.chunkNeeded` | `{ requestId, offset, length }`. mpv reads these bytes of a stream; the UI answers on `stream.ruruka/chunk` |
 | `player.ended` | `{ mediaId, episode }`. The episode reached its end (mpv's `eof-reached`); with « garder mpv ouvert », mpv stays on the last frame instead of closing |
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
@@ -249,7 +251,10 @@ can neither read nor forge session messages.
 **Group watch modes.** The host picks how friends watch (`HostState.mode`): `screen` (shared elsewhere, as above), `files` or `stream`.
 In the last two, `player.sync` goes out on the non-retained `sync` channel, and a friend who follows the host passes each point to
 `player.followHost`. `SyncCorrection` leaves a drift under 0.2 s alone, plays at ±5 % up to 1.5 s, and seeks past that; the host
-leads, so a friend's own pause or seek gets corrected. `files` plays the friend's copy through `playback.playShared`, and
+leads, so a friend's own pause or seek gets corrected, unless the host listed that friend in `HostState.controllerIds`. `MpvSession`
+tells the person's actions from its own corrections (`player.userControl`), so they can't echo around the session: an allowed
+friend's action goes to the host on the `control` channel, `player.applyControl` plays it there, and everyone follows the host's next
+sync point. Host points are ignored for 1.5 s after an action, while older ones are still arriving. `files` plays the friend's copy through `playback.playShared`, and
 `syncOffsetSeconds` covers releases with another timing. When the file is open, the friend's own mpv does the watch tracking.
 
 **Stream.** `state/watchStream.svelte.ts` asks the host's agreement on the `signal` channel, then `api/streamPeer.ts` opens one
@@ -258,7 +263,7 @@ mpv → `LoopbackStreamServer` (127.0.0.1, random port and 256-bit token, Host h
 channel → the host's UI → `stream.ruruka/read`, then back through `stream.ruruka/chunk`. That address is a WebView2 interception,
 not a socket: base64 over the JSON bridge would be slower, and the host opens nothing. A request carries a `fileKey`, so it can't
 read the next episode, and `lib/streamWindow.ts` refuses bytes more than about 3 minutes past the host's position, apart from the
-index areas at both ends of the file. Bytes stay in mpv's memory cache. The original file travels as is, so nothing is transcoded,
+index areas at both ends of the file. Friends allowed to control playback skip that limit, since their seek arrives before the host moves. Bytes stay in mpv's memory cache. The original file travels as is, so nothing is transcoded,
 and each friend picks among the file's own subtitles. Subtitles in separate `.ass` files next to the video are not sent, and burned-in
 ones can't be removed. Links fail on some networks (both sides behind strict NAT): the friend is told to use the screen share.
 

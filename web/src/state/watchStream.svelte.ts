@@ -66,7 +66,7 @@ class WatchStream {
       onSignal: (signal) => groupWatch.sendSignal({ type: 'peer', to: friendId, signal }),
       onConnected: () => this.setViewerStatus(friendId, 'connected'),
       onClosed: () => this.forgetViewer(friendId),
-      readChunk: (request) => this.readChunk(request),
+      readChunk: (request) => this.readChunk(friendId, request),
     });
     this.hostLinks.set(friendId, link);
     groupWatch.sendSignal({ type: 'admit', to: friendId, signal: null });
@@ -187,11 +187,13 @@ class WatchStream {
   }
 
   // <-- Hôte : seuls le fichier du moment et les passages proches de la lecture partent chez l'ami -->
-  private async readChunk({ fileKey, offset, length }: ChunkRequest): Promise<ArrayBuffer | null> {
+  // Un ami autorisé à piloter saute avant que l'hôte n'ait bougé : la limite le couperait au milieu de son geste.
+  private async readChunk(friendId: string, { fileKey, offset, length }: ChunkRequest): Promise<ArrayBuffer | null> {
     const shared = groupWatch.shared;
     const file = groupWatch.streamedFile;
-    if (!shared || !file || fileKey !== file.fileKey || !isRangeAllowed(offset, length, file.fileSize, shared)) return null;
-    return readSharedChunk(offset, length);
+    if (!shared || !file || fileKey !== file.fileKey) return null;
+    const isAllowed = groupWatch.isController(friendId) || isRangeAllowed(offset, length, file.fileSize, shared);
+    return isAllowed ? readSharedChunk(offset, length) : null;
   }
 
   private async shareCurrentFile(): Promise<void> {

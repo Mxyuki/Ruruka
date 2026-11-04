@@ -24,7 +24,13 @@
     </a>
     <FriendWatchOptions />
     {#if groupWatch.following !== 'none'}
-      <p class="muted">Ton lecteur suit {remote.hostName} : c’est lui qui met en pause et avance.</p>
+      <p class="muted">
+        {#if groupWatch.canControl}
+          {remote.hostName} te laisse piloter : ta pause et tes sauts s’appliquent à tout le monde.
+        {:else}
+          Ton lecteur suit {remote.hostName} : c’est lui qui met en pause et avance.
+        {/if}
+      </p>
     {:else if isOwnMpvPlaying}
       <p class="warning">Ton propre lecteur joue un épisode : il passe avant la séance tant qu’il est ouvert.</p>
     {:else}

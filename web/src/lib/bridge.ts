@@ -111,6 +111,8 @@ interface BridgeApi {
   /** Moves this PC's player toward the host's position during a synced session. */
   'player.followHost': [{ positionSeconds: number; isPaused: boolean }, boolean];
   'player.releaseFromHost': [void, boolean];
+  /** Host side: applies the pause or seek of a friend allowed to control playback. */
+  'player.applyControl': [{ positionSeconds: number | null; isPaused: boolean | null }, boolean];
   /** Host side: shares the file its player opened; a friend can never name a path. */
   'stream.share': [void, SharedFile];
   'stream.stopSharing': [void, boolean];
@@ -143,6 +145,8 @@ export interface BridgeEvents {
   'player.progress': { mediaId: number; episode: number; positionSeconds: number; durationSeconds: number };
   /** Exact playback state, on pause, after a seek and every 5 s. */
   'player.sync': { mediaId: number; episode: number; positionSeconds: number; durationSeconds: number; isPaused: boolean };
+  /** The person at this player paused or seeked; sync corrections don't count. Exactly one value is set. */
+  'player.userControl': { mediaId: number; episode: number; positionSeconds: number | null; isPaused: boolean | null };
   /** The player reads these bytes of a stream: answer through `deliverStreamChunk`. */
   'stream.chunkNeeded': { requestId: string; offset: number; length: number };
   /** The episode reached its end; with isPlayerKeptOpen, mpv stays open on the last frame. */

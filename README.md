@@ -99,6 +99,7 @@ son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** qua
   synchronisé avec le tien, ou un flux direct depuis ton PC, où chacun choisit ses sous-titres.
   Leur liste et leur profil en direct suivent. Rien à configurer, aucun port à ouvrir. Le flux passe
   directement entre vos PC : vos adresses IP se voient, et certaines connexions le bloquent.
+  L'hôte peut aussi laisser un ami mettre en pause et avancer pour tout le monde.
 - **Carnet de jour ou de nuit.** Thème clair, sombre, qui suit Windows, ou qui change selon
   l'heure (carnet de jour et carnet de nuit aux heures que tu choisis).
 - **Listes perso** : ajoute un anime à tes listes personnalisées depuis sa fiche, ou crées-en
