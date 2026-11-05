@@ -18,6 +18,7 @@
     { label: 'Accueil', path: '/', icon: 'home' },
     { label: 'Mes anime', path: '/list/anime', icon: 'tv' },
     { label: 'Mes manga', path: '/list/manga', icon: 'book' },
+    { label: 'Calendrier', path: '/calendar', icon: 'calendar' },
     { label: 'Explorer', path: '/search/anime', icon: 'search' },
     { label: 'Personnes', path: '/people', icon: 'user' },
     { label: 'Amis', path: '/social', icon: 'users' },

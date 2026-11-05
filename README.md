@@ -51,6 +51,12 @@ son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** qua
   restent cachés.
 - **L'épisode tout juste sorti à la une.** Un nouvel épisode annoncé par AniList dans les 12
   dernières heures prend la place de l'affaire du jour.
+- **Un calendrier de tes sorties.** Le mois en cours et les suivants, avec les épisodes de ce que tu
+  regardes et le premier épisode de tes « À voir ». Au-delà des dates d'AniList, Ruruka estime les
+  suivantes (en pointillés), sans fin pour les séries longues comme Conan, et par paliers (12, 18, 50
+  puis 100 épisodes) quand le nombre d'épisodes n'est pas annoncé. Masque un anime pour
+  ne plus le voir, et ajoute tes propres événements, sur plusieurs semaines si tu veux, avec un
+  anime attaché et un rythme d'épisodes par semaine.
 - **Social** : l'activité de tes amis, les « j'aime » (survole le cœur pour voir qui a aimé), les
   réponses, la note à côté de chaque anime terminé, et qui te suit en retour. Modifie ou supprime
   tes propres messages avec « ⋯ », et cherche n'importe qui sur AniList depuis la page Amis.

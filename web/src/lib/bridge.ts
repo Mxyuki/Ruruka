@@ -1,6 +1,9 @@
 /** "system" follows the Windows app mode (light or dark); "schedule" switches at two times of day. */
 export type Theme = 'light' | 'dark' | 'system' | 'schedule';
 
+/** Covers in the calendar's day cells; "single" keeps them for days with one anime airing. */
+export type CalendarCovers = 'all' | 'single' | 'none';
+
 export interface Settings {
   aniListClientId: string | null;
   isLoggedIn: boolean;
@@ -24,6 +27,7 @@ export interface Settings {
   minimumWatchedPercent: number;
   /** Minutes both lists of a comparison stay in memory; 0 reloads them on every visit. */
   compareCacheMinutes: number;
+  calendarCovers: CalendarCovers;
   /** The about with live tags, kept on this PC only; empty when the about is plain text. */
   aboutTemplate: string;
   /** Media page section ids in the user's order; empty keeps the default order. */
@@ -87,6 +91,34 @@ export interface SharedFile {
   extension: string;
 }
 
+/** An anime attached to an event; `episodesPerSession` 0 attaches it without an episode goal. */
+export interface CalendarEventAnime {
+  mediaId: number;
+  title: string;
+  coverUrl: string;
+  totalEpisodes: number | null;
+  firstEpisode: number;
+  episodesPerSession: number;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  /** First day, as "yyyy-mm-dd". */
+  date: string;
+  /** "hh:mm", or null for the whole day. */
+  time: string | null;
+  notes: string;
+  /** How many weeks in a row it happens, the first one included. */
+  repeatWeeks: number;
+  anime: CalendarEventAnime | null;
+}
+
+export interface CalendarData {
+  hiddenMediaIds: number[];
+  events: CalendarEvent[];
+}
+
 export interface UpdateInfo {
   version: string;
   currentVersion: string;
@@ -105,6 +137,12 @@ interface BridgeApi {
   'library.getLinks': [void, Record<string, FolderLink>];
   'library.setLink': [{ folderName: string; link: FolderLink }, boolean];
   'library.removeLink': [{ folderName: string }, boolean];
+  'calendar.get': [void, CalendarData];
+  /** Adds the event, or replaces the one with the same id. */
+  'calendar.saveEvent': [CalendarEvent, boolean];
+  'calendar.removeEvent': [{ id: string }, boolean];
+  'calendar.hideMedia': [{ mediaId: number }, boolean];
+  'calendar.showMedia': [{ mediaIds: number[] }, boolean];
   'player.detect': [void, PlayerStatus];
   'player.setPath': [{ path: string }, boolean];
   'player.play': [PlaybackTarget, boolean];

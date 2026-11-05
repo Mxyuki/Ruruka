@@ -3,36 +3,37 @@
 
   interface Props {
     value: number;
+    min?: number;
     max?: number | null;
     step?: number;
     label: string;
     onchange: (value: number) => void;
   }
 
-  let { value, max = null, step = 1, label, onchange }: Props = $props();
+  let { value, min = 0, max = null, step = 1, label, onchange }: Props = $props();
   const decimals = $derived(step < 1 ? 1 : 0);
 
   function set(requested: number) {
     const rounded = Math.round(requested / step) * step;
-    const clamped = Math.min(Math.max(rounded, 0), max ?? Infinity);
+    const clamped = Math.min(Math.max(rounded, min), max ?? Infinity);
     const next = Number(clamped.toFixed(decimals));
     if (next !== value) onchange(next);
   }
 </script>
 
 <div class="stepper">
-  <button class="btn btn-ghost btn-sm" type="button" aria-label="Diminuer : {label}" disabled={value <= 0} onclick={() => set(value - step)}>
+  <button class="btn btn-ghost btn-sm" type="button" aria-label="Diminuer : {label}" disabled={value <= min} onclick={() => set(value - step)}>
     <Icon name="minus" size={14} />
   </button>
   <input
     class="input"
     type="number"
-    min="0"
+    {min}
     max={max ?? undefined}
     {step}
     aria-label={label}
     value={value.toFixed(decimals)}
-    onchange={(event) => set(Number(event.currentTarget.value) || 0)}
+    onchange={(event) => set(Number(event.currentTarget.value) || min)}
   />
   {#if max}<span class="max">/ {max}</span>{/if}
   <button class="btn btn-ghost btn-sm" type="button" aria-label="Augmenter : {label}" disabled={max !== null && value >= max} onclick={() => set(value + step)}>

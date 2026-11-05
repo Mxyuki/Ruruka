@@ -40,6 +40,9 @@ public sealed record AppSettings
     /// <summary>How long (in minutes) both lists of a comparison stay in memory; 0 reloads them on every visit.</summary>
     public int CompareCacheMinutes { get; init; } = 10;
 
+    /// <summary>Covers in the calendar's day cells: "all", "single" (only when one anime airs that day) or "none".</summary>
+    public string CalendarCovers { get; init; } = "all";
+
     /// <summary>The profile "about" with live tags, kept on this PC only; empty when the about is plain text.</summary>
     public string AboutTemplate { get; init; } = "";
 
@@ -82,6 +85,7 @@ public sealed record AppSettings
         EpisodeCompletionPercent,
         MinimumWatchedPercent,
         CompareCacheMinutes,
+        CalendarCovers,
         AboutTemplate,
         MediaSectionOrder,
         MangaLanguage,
@@ -109,6 +113,7 @@ public sealed record PublicSettings(
     int EpisodeCompletionPercent,
     int MinimumWatchedPercent,
     int CompareCacheMinutes,
+    string CalendarCovers,
     string AboutTemplate,
     IReadOnlyList<string> MediaSectionOrder,
     string MangaLanguage,
@@ -135,6 +140,7 @@ public sealed record SettingsPatch
     public int? EpisodeCompletionPercent { get; init; }
     public int? MinimumWatchedPercent { get; init; }
     public int? CompareCacheMinutes { get; init; }
+    public string? CalendarCovers { get; init; }
 
     /// <summary>An empty string clears the template.</summary>
     public string? AboutTemplate { get; init; }

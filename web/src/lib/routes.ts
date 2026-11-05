@@ -9,6 +9,7 @@ const page = (load: () => Promise<{ default: Component<never> }>) => load as Rou
 export const routes: RouteDefinition[] = [
   { pattern: '/', load: page(() => import('../pages/home/HomePage.svelte')) },
   { pattern: '/list/:type', load: page(() => import('../pages/list/ListPage.svelte')) },
+  { pattern: '/calendar', load: page(() => import('../pages/calendar/CalendarPage.svelte')) },
   { pattern: '/media/:id', load: page(() => import('../pages/media/MediaPage.svelte')) },
   { pattern: '/search/:type', load: page(() => import('../pages/search/SearchPage.svelte')) },
   { pattern: '/people', load: page(() => import('../pages/people/PeoplePage.svelte')) },

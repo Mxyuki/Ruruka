@@ -35,6 +35,7 @@ public sealed class SettingsStore
         EpisodeCompletionPercent = patch.EpisodeCompletionPercent ?? settings.EpisodeCompletionPercent,
         MinimumWatchedPercent = patch.MinimumWatchedPercent ?? settings.MinimumWatchedPercent,
         CompareCacheMinutes = patch.CompareCacheMinutes ?? settings.CompareCacheMinutes,
+        CalendarCovers = patch.CalendarCovers ?? settings.CalendarCovers,
         AboutTemplate = patch.AboutTemplate ?? settings.AboutTemplate,
         MediaSectionOrder = patch.MediaSectionOrder ?? settings.MediaSectionOrder,
         MangaLanguage = patch.MangaLanguage ?? settings.MangaLanguage,

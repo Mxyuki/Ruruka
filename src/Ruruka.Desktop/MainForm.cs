@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using Microsoft.Web.WebView2.WinForms;
 using Ruruka.Desktop.Bridge;
 using Ruruka.Desktop.Bridge.Modules;
+using Ruruka.Desktop.Calendar;
 using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Manga;
 using Ruruka.Desktop.Player;
@@ -25,6 +26,7 @@ internal sealed class MainForm : Form
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly SettingsStore _settings;
     private readonly LinkStore _links;
+    private readonly CalendarStore _calendar;
     private readonly TrayIcon _tray;
     private readonly System.Windows.Forms.Timer _themeSwitchTimer = new();
     private CoreWebView2Environment? _environment;
@@ -43,10 +45,11 @@ internal sealed class MainForm : Form
     public string? PendingInstaller { get; private set; }
 
     /// <param name="isStartingHidden">Launched by Windows at sign-in: stay in the notification area until opened.</param>
-    public MainForm(SettingsStore settings, LinkStore links, bool isStartingHidden)
+    public MainForm(SettingsStore settings, LinkStore links, CalendarStore calendar, bool isStartingHidden)
     {
         _settings = settings;
         _links = links;
+        _calendar = calendar;
         _isStartingHidden = isStartingHidden;
 
         Text = "Ruruka";
@@ -289,6 +292,7 @@ internal sealed class MainForm : Form
             new SettingsModule(_settings, OnSettingsChanged),
             new AuthModule(_settings, this, () => _environment!),
             new LibraryModule(_settings, _links),
+            new CalendarModule(_calendar),
             new PlayerModule(player),
             new StreamModule(stream),
             new ShellModule(this),

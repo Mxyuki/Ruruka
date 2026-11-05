@@ -6,7 +6,7 @@
   import PlayerSetup from '../../components/PlayerSetup.svelte';
   import Sticker from '../../components/Sticker.svelte';
   import Toggle from '../../components/Toggle.svelte';
-  import type { SettingsPatch } from '../../lib/bridge';
+  import type { CalendarCovers, SettingsPatch } from '../../lib/bridge';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
   import SectionOrderDialog from './SectionOrderDialog.svelte';
@@ -25,6 +25,11 @@
 
   const completionOptions = [70, 75, 80, 85, 90, 95];
   const minimumWatchedOptions = [30, 40, 50, 60, 70];
+  const calendarCoverOptions: [CalendarCovers, string][] = [
+    ['all', 'Toujours'],
+    ['single', 'Seulement s’il y a un seul anime'],
+    ['none', 'Jamais'],
+  ];
   const compareCacheOptions: [number, string][] = [
     [0, 'Désactivée'],
     [5, '5 min'],
@@ -140,6 +145,18 @@
     </section>
 
     <!-- Combien de temps une comparaison garde les deux listes -->
+    <section class="card" style:--accent="var(--colorSky)">
+      <h2 class="note-label">Calendrier</h2>
+      <p class="hint">Les images des anime qui sortent ce jour-là, dans les cases du calendrier. Jusqu’à quatre tiennent dans une case.</p>
+      <div class="themes">
+        {#each calendarCoverOptions as [value, label] (value)}
+          <button class="chip" class:is-active={session.settings?.calendarCovers === value} type="button" onclick={() => update({ calendarCovers: value })}>
+            {label}
+          </button>
+        {/each}
+      </div>
+    </section>
+
     <section class="card" style:--accent="var(--colorMauve)">
       <h2 class="note-label">Comparer nos carnets</h2>
       <p class="hint">

@@ -68,10 +68,11 @@ src/Ruruka.Desktop/          C# host
   Program.cs, MainForm.cs    window, WebView2 setup, navigation policy
   AppPaths.cs                %APPDATA%/%LOCALAPPDATA% locations
   Bridge/                    JSON message router between UI and host
-    Modules/                 one file per area: Settings, Auth, Library, Player, Shell
+    Modules/                 one file per area: Settings, Auth, Library, Calendar, Player, Shell
   Settings/                  settings.json persistence + token encryption
   Auth/                      AniList OAuth window
   Library/                   folder scanning, filename parsing, folder ↔ media links
+  Calendar/                  calendar.json: personal events and anime hidden from the calendar (CalendarStore)
   Player/                    mpv discovery (MpvLocator), bundled player (PlayerChoice), process + IPC (MpvSession), watched-time maths (WatchTracker), host following (SyncCorrection)
   Streaming/                 group watch stream: shared file + local address (StreamService), mpv's HTTP side (LoopbackStreamServer), bytes to the UI (StreamResources)
   Windowing/                 Windows 11 title-bar theming (DWM), tray icon, startup with Windows (StartupRegistration)
@@ -117,6 +118,8 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `auth.login` / `auth.setToken` / `auth.getToken` / `auth.logout` | AniList OAuth + token storage |
 | `library.scan` | Scan the library root, return folders + parsed episodes |
 | `library.getLinks` / `library.setLink` / `library.removeLink` | Folder ↔ media links |
+| `calendar.get` / `calendar.saveEvent` / `calendar.removeEvent` | Personal calendar events. `saveEvent` adds, or replaces the event with the same id |
+| `calendar.hideMedia` / `calendar.showMedia` | Anime hidden from the calendar. `showMedia` takes several ids, for the automatic cleanup |
 | `player.detect` / `player.setPath` / `player.play` | Find or pick mpv, launch an episode with tracking |
 | `player.followHost` / `player.releaseFromHost` | Keep this PC's player on the host's position, or stop |
 | `player.applyControl` | Host: apply the pause or seek of a friend allowed to control playback |
@@ -267,6 +270,11 @@ index areas at both ends of the file. Friends allowed to control playback skip t
 and each friend picks among the file's own subtitles. Subtitles in separate `.ass` files next to the video are not sent, and burned-in
 ones can't be removed. Links fail on some networks (both sides behind strict NAT): the friend is told to use the screen share.
 
+**Calendar.** `/calendar` shows the current month and the months ahead; earlier months aren't offered. `pages/calendar/calendar.svelte.ts` keeps what's on screen; the dates come from `pages/calendar/airingForecast.ts`, a pure function. CURRENT and REPEATING entries show every episode, PLANNING entries only episode 1.
+Dates come from two queries, cached 15 minutes: `fetchAiringPlans` (one request per 50 media, up to 25 upcoming episodes each, plus `startDate`) and `fetchAiredEpisodes`, for the episodes already aired since three weeks before the first visible day. `Media.airingSchedule` can't be filtered by date, hence the second, paged query (6 pages at most). Sending `episode: null` makes AniList answer with no rows, so the variable must be left out.
+Past the last date AniList knows, the forecast adds one episode per cadence (the median gap between known episodes, 7 days by default) until the announced episode count. With no announced count it aims for the next likely size past the episodes already aired (12, 18, 50, then 100), and past 100 episodes it never stops, so long-running shows keep going while a seasonal anime doesn't fill the calendar for years. It counts in seconds, since Japanese broadcasts have no daylight saving time. A media with no schedule yet starts from an exact `startDate` at local noon, shown without an hour. Only RELEASING and NOT_YET_RELEASED media are forecast, so a hiatus shows nothing invented. Estimated dates are dashed and marked `~`. Day cells show the covers of the anime airing that day behind the labels, four at most (`AppSettings.CalendarCovers`: always, only with a single anime, or never). They use the `large` size, since `medium` blurs at the width of a cell. Labels stack from the bottom of the cell, the day's first one lowest. A new AniList date replaces the estimate on the next load, since nothing estimated is stored.
+Events are stored as one first day plus `repeatWeeks` (the first week included), and each week of a series is computed, so they're edited or deleted as a whole. An attached anime keeps its title, cover and episode count in the event, so a finished anime needs no request, and `episodesForOccurrence` turns `firstEpisode` + `episodesPerSession` into each week's episodes. Hidden anime leave the list on the next page load once AniList says they're finished or cancelled, or the viewer completed them.
+
 **Airing countdowns** are computed from `airingAt` at render time (`formatCountdown`), not from
 AniList's `timeUntilAiring` snapshot, and each visit to the home page reloads the anime list when an
 episode it announces has aired since it was loaded (`mediaList.refreshIfAired`).
@@ -368,6 +376,7 @@ full rows as fit around 12 (12 on 4 columns, 15 on 5), and balance the rows when
 | Home: continue watching (ready-to-play first), random pick (watching / planning / any popular anime not completed), airing soon (watching, or planned when episode 1 airs), season trends linking to a filtered Explorer, friends' activity | ✅ |
 | Anime / manga list with status tabs, filter, sort, inline +1, airing anime grouped first | ✅ |
 | Media page (restructured header, relations, characters, staff, stats, friends, tags, trailer, recommendations) | ✅ |
+| Calendar: airing dates of watched anime (announced, then forecast), first episodes of planned anime, hidden anime, personal events repeating over several weeks with an attached anime and episode pace | ✅ |
 | List entry editor (status, progress, score, dates, repeat, notes, private) | ✅ |
 | Browse / search with filters, several genres / tags (required or excluded), minimum % per tag, list status labels and filter | ✅ |
 | Character, staff (every voiced character once, first appearance), studio pages | ✅ |

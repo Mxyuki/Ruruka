@@ -59,6 +59,10 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
         {
             throw new BridgeException($"La mémoire des comparaisons va de 0 à {MaxCompareCacheMinutes} minutes.");
         }
+        if (patch.CalendarCovers is not (null or "all" or "single" or "none"))
+        {
+            throw new BridgeException("Choix d'images du calendrier inconnu.");
+        }
         if (patch.MediaSectionOrder is { } order && (order.Count > MaxSectionCount || order.Any(id => !SectionId().IsMatch(id))))
         {
             throw new BridgeException("Ordre des sections invalide.");

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Ruruka.Desktop.Calendar;
 using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Settings;
 using Ruruka.Desktop.Windowing;
@@ -26,7 +27,8 @@ internal static class Program
 
         var settings = new SettingsStore(AppPaths.SettingsFile);
         var links = new LinkStore(AppPaths.LibraryLinksFile);
-        var window = new MainForm(settings, links, isStartingHidden: args.Contains(StartupRegistration.StartupArgument));
+        var calendar = new CalendarStore(AppPaths.CalendarFile);
+        var window = new MainForm(settings, links, calendar, isStartingHidden: args.Contains(StartupRegistration.StartupArgument));
 
         var showRequests = ThreadPool.RegisterWaitForSingleObject(showEvent, (_, _) =>
         {

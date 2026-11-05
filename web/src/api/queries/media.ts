@@ -1,6 +1,6 @@
 import { gql, gqlBackground } from '../client';
 import { cached, invalidate, minuteMs } from '../cache';
-import type { FuzzyDate, MediaListStatus, MediaSummary, MediaType, NamedNode } from '../types';
+import type { AiringEpisode, FuzzyDate, MediaListStatus, MediaSummary, MediaType, NamedNode, PageInfo } from '../types';
 import { mediaSummaryFields } from './fragments';
 
 export interface Ranking {
@@ -228,6 +228,78 @@ export async function fetchMediaSummaries(ids: number[]): Promise<MediaSummary[]
   if (!ids.length) return [];
   const { Page } = await gql<{ Page: { media: MediaSummary[] } }>(summariesQuery, { ids: ids.slice(0, 50) });
   return Page.media;
+}
+
+const airingCacheMinutes = 15;
+const airingChunk = 50;
+const maxAiredPages = 6;
+
+/** What AniList announces for one media; its schedule stops at the dates it knows. */
+export interface MediaAiringPlan {
+  id: number;
+  startDate: FuzzyDate;
+  airingSchedule: { nodes: AiringEpisode[] };
+}
+
+const airingPlansQuery = `
+  query ($ids: [Int]) {
+    Page(perPage: 50) {
+      media(id_in: $ids) {
+        id
+        startDate { year month day }
+        airingSchedule(perPage: 25, notYetAired: true) { nodes { episode airingAt } }
+      }
+    }
+  }
+`;
+
+/** Upcoming episodes of many media, one request per 50 of them. */
+export function fetchAiringPlans(ids: number[]): Promise<MediaAiringPlan[]> {
+  return cached(`airingPlans:${ids.join(',')}`, airingCacheMinutes * minuteMs, async () => {
+    const plans: MediaAiringPlan[] = [];
+    for (let start = 0; start < ids.length; start += airingChunk) {
+      const { Page } = await gql<{ Page: { media: MediaAiringPlan[] } }>(airingPlansQuery, { ids: ids.slice(start, start + airingChunk) });
+      plans.push(...Page.media);
+    }
+    return plans;
+  });
+}
+
+export interface AiredEpisode extends AiringEpisode {
+  mediaId: number;
+}
+
+const airedEpisodesQuery = `
+  query ($ids: [Int], $fromSeconds: Int, $toSeconds: Int, $episode: Int, $page: Int) {
+    Page(page: $page, perPage: 50) {
+      pageInfo { hasNextPage currentPage }
+      airingSchedules(mediaId_in: $ids, episode: $episode, airingAt_greater: $fromSeconds, airingAt_lesser: $toSeconds, sort: TIME) {
+        mediaId
+        episode
+        airingAt
+      }
+    }
+  }
+`;
+
+/**
+ * Episodes of these media aired since `fromSeconds` (Unix seconds), optionally a single episode number.
+ * `Media.airingSchedule` can't be filtered by date, which is why this one is a separate paged query.
+ */
+export function fetchAiredEpisodes(ids: number[], fromSeconds: number, episode?: number): Promise<AiredEpisode[]> {
+  if (!ids.length) return Promise.resolve([]);
+  return cached(`airedEpisodes:${fromSeconds}:${episode ?? 'all'}:${ids.join(',')}`, airingCacheMinutes * minuteMs, async () => {
+    const toSeconds = Math.floor(Date.now() / 1000);
+    const aired: AiredEpisode[] = [];
+    for (let page = 1; page <= maxAiredPages; page++) {
+      // <-- `episode: null` renvoie zéro ligne chez AniList : sans filtre, la variable doit être absente -->
+      const variables = { ids, fromSeconds, toSeconds, page, ...(episode !== undefined && { episode }) };
+      const { Page } = await gql<{ Page: { pageInfo: PageInfo; airingSchedules: AiredEpisode[] } }>(airedEpisodesQuery, variables);
+      aired.push(...Page.airingSchedules);
+      if (!Page.pageInfo.hasNextPage) break;
+    }
+    return aired;
+  });
 }
 
 const titleSearchQuery = `

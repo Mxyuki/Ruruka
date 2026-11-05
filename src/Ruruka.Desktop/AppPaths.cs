@@ -15,6 +15,8 @@ internal static class AppPaths
 
     public static string LibraryLinksFile => Path.Combine(RoamingData, "library-links.json");
 
+    public static string CalendarFile => Path.Combine(RoamingData, "calendar.json");
+
     public static string WebViewData => Path.Combine(LocalData, "WebView2");
 
     public static string WebRoot => Path.Combine(AppContext.BaseDirectory, "wwwroot");
