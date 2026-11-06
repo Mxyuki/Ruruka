@@ -84,6 +84,7 @@ internal sealed class MainForm : Form
     public void ShowForOtherInstance()
     {
         ShowFromTray();
+        _presence?.ConnectNow();
         if (MediaLink.TakeLeftByOtherInstance() is not { } mediaId) return;
         _pendingMediaLink = mediaId;
         _bridge?.Emit("window.mediaLinkOpened", new { });
@@ -307,7 +308,7 @@ internal sealed class MainForm : Form
     private BridgeRouter CreateRouter(CoreWebView2 core, IBridgeEvents events)
     {
         var router = new BridgeRouter();
-        _presence = new DiscordPresence(_settings);
+        _presence = new DiscordPresence(_settings, events, () => BeginInvoke(ShowFromTray));
         var player = new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray), _presence);
         var stream = new StreamService(player, events);
         new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
@@ -319,6 +320,7 @@ internal sealed class MainForm : Form
             new CalendarModule(_calendar),
             new PlayerModule(player),
             new StreamModule(stream),
+            new DiscordModule(_presence),
             new ShellModule(this),
             new WindowModule(this, () => _uiFinishedSignal.TrySetResult(), TakeMediaLink),
             new UpdateModule(new UpdateService(), QuitForUpdate),

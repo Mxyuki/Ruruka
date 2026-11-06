@@ -75,7 +75,7 @@ src/Ruruka.Desktop/          C# host
   Auth/                      AniList OAuth window
   Library/                   folder scanning, filename parsing, folder ↔ media links
   Calendar/                  calendar.json: personal events and anime hidden from the calendar (CalendarStore)
-  Discord/                   Ruruka player activity on Discord: activity contents (DiscordActivity), pipe protocol (DiscordIpcClient), latest-state worker (DiscordPresence)
+  Discord/                   Discord activity and session invitations: activity contents (DiscordActivity), pipe protocol (DiscordIpcClient), latest-state worker (DiscordPresence)
   Player/                    mpv discovery (MpvLocator), bundled player (PlayerChoice), process + IPC (MpvSession), watched-time maths (WatchTracker), host following (SyncCorrection)
   Streaming/                 group watch stream: shared file + local address (StreamService), mpv's HTTP side (LoopbackStreamServer), bytes to the UI (StreamResources)
   Windowing/                 Windows 11 title-bar theming (DWM), tray icon, startup with Windows (StartupRegistration), ruruka:// links (MediaLink)
@@ -130,6 +130,8 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `window.takeMediaLink` | The anime of a waiting `ruruka://media/{id}` link, once; null otherwise. The UI asks at startup and on `window.mediaLinkOpened` |
+| `discord.setInvite` | Host: offer this session to Discord invitations; a null code ends that |
+| `discord.takeJoinCode` | The code of an invitation accepted on this PC, once; null otherwise. The UI asks once logged in and on `discord.joinRequested` |
 | `shell.openUrl` | Open an http(s) link in the default browser |
 | `shell.openPath` | Open a folder in Explorer or a video in its default app (nothing else, by design) |
 | `shell.pickFolder` / `shell.pickFile` | Native dialogs |
@@ -149,6 +151,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.ended` | `{ mediaId, episode }`. The episode reached its end (mpv's `eof-reached`); with « garder mpv ouvert », mpv stays on the last frame instead of closing |
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
 | `window.mediaLinkOpened` | `{}`. A `ruruka://` link reached the running app |
+| `discord.joinRequested` | `{}`. An invitation was accepted on this PC |
 | `window.closing` | `{}`. The app is really quitting; the UI answers with `window.readyToQuit` (the host waits 5 s at most) |
 
 The UI never navigates away from the app page. `MainForm` sends every outbound navigation
@@ -176,7 +179,9 @@ mpv reports `file-loaded`, then asks for `duration` once (mpv only notifies chan
 `AppSettings.IsPlayerKeptOpen` (default on), mpv gets `--keep-open=yes`, and the UI offers the next
 episode on `player.ended` rather than waiting for `player.closed`.
 
-**Discord activity.** Only the bundled player reports to `DiscordPresence`, through `IPlaybackListener`, and only while `AppSettings.IsDiscordPresenceShown` is on (default on). The listener belongs to the mpv session, so an episode loaded into that window keeps it. Each `player.sync` point wakes one worker that keeps only the latest state: Discord being slow or closed never holds up tracking, and no timer runs. It skips an update when the bar's end stays within 4 s (a pause, a seek or a new speed moves it), waits 4 s after each send (Discord allows 5 per 20 s) and tries to connect at most every 30 s during playback. The activity is type Watching with start and end times, which draw Discord's time bar; a pause removes them and writes the time in the text. The AniList cover is the large image and the icon from the repository its small badge. Closing the pipe removes the activity.
+**Discord activity.** Only the bundled player reports to `DiscordPresence`, through `IPlaybackListener`, and only while `AppSettings.IsDiscordPresenceShown` is on (default on). The listener belongs to the mpv session, so an episode loaded into that window keeps it. Each `player.sync` point wakes one worker that keeps only the latest state: Discord being slow or closed never holds up tracking, and no timer runs. It skips an update when the bar's end stays within 4 s (a pause, a seek or a new speed moves it), waits 4 s after each send (Discord allows 5 per 20 s) and tries to connect at most every 30 s. The pipe stays open while the app runs, because accepted invitations arrive on it. The activity is type Watching with start and end times, which draw Discord's time bar; a pause removes them and writes the time in the text. The AniList cover is the large image and the icon from the repository its small badge. With nothing to show, the activity is cleared; turning the setting off closes the pipe, which also ends invitations in both directions.
+
+**Discord invitations.** While a session is hosted, `groupWatch` calls `discord.setInvite` and the activity gains a party and a join secret, which is what makes Discord offer invitations from the chat's **+** menu. Discord refuses a join secret next to buttons, so « Ouvrir dans Ruruka » is gone until the session closes. A hosted session with nothing playing still gets an activity, since invitations need one, whichever player is chosen. The secret is the session code: Discord sees it and gives it to whoever accepts an invitation, and the public party id is only a hash of it. On the friend's side, `SUBSCRIBE ACTIVITY_JOIN` delivers the secret; `ACTIVITY_JOIN_REQUEST` is deliberately not subscribed, so « ask to join » from a profile lets nobody in. If Ruruka is closed, Discord opens the `discord-{applicationId}://` protocol that `MediaLink.Register` writes, and a second instance asks the running one to look for Discord at once.
 
 **Discord button.** The button opens `mxyuki.github.io/Ruruka/open/?media={id}`, which navigates to `ruruka://media/{id}`. A browser can't tell whether a protocol exists, so the page watches for losing focus to Ruruka or to the browser's « open this app? » prompt; without that within 2.5 s it replaces itself with the AniList page. A tab opened by Discord has one history entry, which lets `window.close()` work. `MediaLink.Register` writes the protocol under `HKCU\Software\Classes\ruruka` at each launch, except in development. Windows then starts a second Ruruka with the link: `Program` passes the id to the running instance through `pending-media-link.txt` and the show event. The id is the only thing read from a link, because any website can open one.
 

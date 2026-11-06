@@ -2,13 +2,18 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using Ruruka.Desktop.Discord;
 
 namespace Ruruka.Desktop.Windowing;
 
-/// <summary>The ruruka://media/{id} links of the Discord button: registered with Windows and handed to the running app.</summary>
+/// <summary>
+/// The ruruka://media/{id} links of the Discord button, registered with Windows and handed to the running app,
+/// and the protocol Discord opens to start Ruruka for an accepted invitation.
+/// </summary>
 internal static partial class MediaLink
 {
     private const string ProtocolKeyPath = @"Software\Classes\ruruka";
+    private const string DiscordProtocolKeyPath = @"Software\Classes\discord-" + DiscordPresence.ApplicationId;
 
     /// <summary>The AniList id in the arguments Windows passes; anything else is ignored, since any website can open such a link.</summary>
     public static int? Find(IEnumerable<string> arguments)
@@ -27,18 +32,24 @@ internal static partial class MediaLink
         var executablePath = Environment.ProcessPath!;
         try
         {
-            using var protocolKey = Registry.CurrentUser.CreateSubKey(ProtocolKeyPath, writable: true);
-            protocolKey.SetValue("", "URL:Ruruka");
-            protocolKey.SetValue("URL Protocol", "");
-            using var iconKey = protocolKey.CreateSubKey("DefaultIcon", writable: true);
-            iconKey.SetValue("", $"\"{executablePath}\",0");
-            using var commandKey = protocolKey.CreateSubKey(@"shell\open\command", writable: true);
-            commandKey.SetValue("", CommandFor(executablePath));
+            RegisterProtocol(ProtocolKeyPath, executablePath);
+            RegisterProtocol(DiscordProtocolKeyPath, executablePath);
         }
         catch (Exception error) when (error is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             Debug.WriteLine($"[link] protocol not registered: {error.Message}");
         }
+    }
+
+    private static void RegisterProtocol(string keyPath, string executablePath)
+    {
+        using var protocolKey = Registry.CurrentUser.CreateSubKey(keyPath, writable: true);
+        protocolKey.SetValue("", "URL:Ruruka");
+        protocolKey.SetValue("URL Protocol", "");
+        using var iconKey = protocolKey.CreateSubKey("DefaultIcon", writable: true);
+        iconKey.SetValue("", $"\"{executablePath}\",0");
+        using var commandKey = protocolKey.CreateSubKey(@"shell\open\command", writable: true);
+        commandKey.SetValue("", CommandFor(executablePath));
     }
 
     /// <summary>A second Ruruka started by a link leaves the id for the running one, then quits.</summary>

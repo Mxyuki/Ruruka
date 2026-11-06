@@ -21,7 +21,7 @@ export interface Settings {
   isLaunchedAtStartup: boolean;
   /** mpv stays open on the last frame of an episode, so the next one plays in the same window. */
   isPlayerKeptOpen: boolean;
-  /** The Ruruka player shows the anime, episode and time on the Discord profile. */
+  /** Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations. */
   isDiscordPresenceShown: boolean;
   /** How far into an episode (in %) playback must reach before it counts as watched. */
   episodeCompletionPercent: number;
@@ -161,6 +161,10 @@ interface BridgeApi {
   /** Friend side: opens the local address fed by the UI and plays it. */
   'stream.play': [{ mediaId: number; episode: number; title: string; coverUrl: string; fileSize: number; extension: string }, boolean];
   'stream.closeViewer': [void, boolean];
+  /** Host side: offers the session to Discord invitations; a null code ends that. */
+  'discord.setInvite': [{ code: string | null; memberCount: number }, boolean];
+  /** The code of an invitation accepted on this PC, once; null otherwise. */
+  'discord.takeJoinCode': [void, string | null];
   'shell.openUrl': [{ url: string }, boolean];
   'shell.openPath': [{ path: string }, boolean];
   'shell.pickFolder': [{ title?: string }, string | null];
@@ -200,6 +204,8 @@ export interface BridgeEvents {
   'window.closing': Record<string, never>;
   /** A ruruka:// link reached the running app: collect it with "window.takeMediaLink". */
   'window.mediaLinkOpened': Record<string, never>;
+  /** An invitation was accepted on this PC: collect it with "discord.takeJoinCode". */
+  'discord.joinRequested': Record<string, never>;
 }
 
 type Method = keyof BridgeApi;

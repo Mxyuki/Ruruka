@@ -72,6 +72,7 @@ Name: "{autodesktop}\Ruruka"; Filename: "{app}\Ruruka.exe"; Tasks: desktopicon
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Ruruka"; Flags: uninsdeletevalue dontcreatekey
 ; <-- Le protocole ruruka:// est écrit par l'app à chaque lancement : la désinstallation le retire -->
 Root: HKCU; Subkey: "Software\Classes\ruruka"; ValueType: none; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\discord-1568045470675239012"; ValueType: none; Flags: uninsdeletekey dontcreatekey
 
 [Run]
 ; <-- Sans skipifsilent : après une mise à jour silencieuse lancée par l'app, Ruruka se relance tout seul -->

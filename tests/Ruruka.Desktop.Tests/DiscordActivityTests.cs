@@ -119,6 +119,51 @@ public class DiscordActivityTests
     }
 
     [Fact]
+    public void HostedSessionTradesTheButtonForAnInvitation()
+    {
+        var payload = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 3)));
+
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("buttons").ValueKind);
+        Assert.Equal("7KX3P-QM9TZ", payload.GetProperty("secrets").GetProperty("join").GetString());
+        Assert.True(payload.GetProperty("instance").GetBoolean());
+        Assert.Equal(3, payload.GetProperty("party").GetProperty("size")[0].GetInt32());
+        Assert.Equal(10, payload.GetProperty("party").GetProperty("size")[1].GetInt32());
+    }
+
+    [Fact]
+    public void PublicPartyIdDoesNotHoldTheCode()
+    {
+        var party = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 1))).GetProperty("party");
+
+        Assert.DoesNotContain("7KX3P", party.GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public void LargerSessionRaisesThePartySize()
+    {
+        var size = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 14))).GetProperty("party").GetProperty("size");
+
+        Assert.Equal(14, size[1].GetInt32());
+    }
+
+    [Fact]
+    public void NewFriendInTheSessionNeedsAnUpdate()
+    {
+        var shown = DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 1));
+
+        Assert.False(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 2)).LooksLike(shown));
+    }
+
+    [Fact]
+    public void OpenSessionWithoutEpisodeStaysInvitable()
+    {
+        var payload = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1)));
+
+        Assert.Equal("7KX3P-QM9TZ", payload.GetProperty("secrets").GetProperty("join").GetString());
+        Assert.Equal(DiscordActivity.IconUrl, payload.GetProperty("assets").GetProperty("large_image").GetString());
+    }
+
+    [Fact]
     public void FrameHoldsLittleEndianOpcodeAndByteLength()
     {
         var frame = DiscordIpcClient.EncodeFrame(1, "{\"é\":1}");

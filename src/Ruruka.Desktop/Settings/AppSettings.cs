@@ -31,7 +31,7 @@ public sealed record AppSettings
     /// <summary>mpv stays open on the last frame of an episode, so the next one plays in the same window.</summary>
     public bool IsPlayerKeptOpen { get; init; } = true;
 
-    /// <summary>The Ruruka player shows the anime, episode and time on the Discord profile.</summary>
+    /// <summary>Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations.</summary>
     public bool IsDiscordPresenceShown { get; init; } = true;
 
     /// <summary>How far into an episode (in %) playback must reach before it counts as watched.</summary>

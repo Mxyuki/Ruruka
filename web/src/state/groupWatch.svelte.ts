@@ -260,6 +260,13 @@ class GroupWatch {
     await this.connect(code, 'joined');
   }
 
+  /** Accepts a Discord invitation: an invitation to another session replaces the current one. */
+  async acceptInvite(code: string): Promise<void> {
+    if (this.role === 'joined' && this.code === normalizeWatchCode(code)) return;
+    if (this.role !== 'idle') await this.leave();
+    await this.join(code);
+  }
+
   /** Host side: changes how friends see the episode, for the whole session. */
   setMode(mode: WatchMode): void {
     this.mode = mode;
@@ -340,9 +347,16 @@ class GroupWatch {
       this.isReconnecting = false;
       if (role === 'hosting') await this.publishHostState();
       else await this.room.publish(friendsChannel, this.notice('join'), false);
+      this.updateDiscordInvite();
     } finally {
       this.isConnecting = false;
     }
+  }
+
+  // <-- L'hôte peut inviter depuis Discord tant que sa séance existe -->
+  private updateDiscordInvite(): void {
+    const code = this.role === 'hosting' ? this.code : null;
+    invoke('discord.setInvite', { code, memberCount: this.friends.length + 1 }).catch((error: unknown) => toasts.error(error, 'Impossible de préparer les invitations Discord'));
   }
 
   // <-- Coupure réseau : on retente quelques fois avec le même code, la séance n'est pas finie pour autant -->
@@ -493,11 +507,13 @@ class GroupWatch {
     if (notice.type === 'leave') {
       if (!isNew) toasts.show(`${notice.name} a quitté la séance.`, 'info');
       this.friends = others;
+      this.updateDiscordInvite();
       if (this.isController(notice.friendId)) this.setController(notice.friendId, false);
       return;
     }
     if (isNew) toasts.show(`${notice.name} a rejoint la séance !`, 'info');
     this.friends = [...others, { friendId: notice.friendId, name: notice.name }];
+    this.updateDiscordInvite();
   }
 
   // <-- Les états sont traités dans l'ordre d'arrivée, même quand il faut d'abord charger l'anime -->

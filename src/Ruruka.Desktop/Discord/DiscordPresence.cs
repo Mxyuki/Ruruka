@@ -1,35 +1,47 @@
 using System.Threading.Channels;
+using Ruruka.Desktop.Bridge;
 using Ruruka.Desktop.Player;
 using Ruruka.Desktop.Settings;
 
 namespace Ruruka.Desktop.Discord;
 
 /// <summary>
-/// Shows the Ruruka player's episode on Discord. mpv's position updates drive it: one worker keeps
-/// only the latest state, so a slow or absent Discord never holds up playback tracking.
+/// Shows the Ruruka player's episode and the hosted session on Discord, and receives accepted invitations.
+/// mpv's position updates drive it: one worker keeps only the latest state, so a slow or absent Discord
+/// never holds up playback tracking.
 /// </summary>
 internal sealed class DiscordPresence : IPlaybackListener
 {
-    private const string ApplicationId = "1568045470675239012";
+    internal const string ApplicationId = "1568045470675239012";
 
     // Discord allows 5 updates per 20 seconds.
     private static readonly TimeSpan MinUpdateInterval = TimeSpan.FromSeconds(4);
 
     // Playback wakes the worker every few seconds, so a Discord started later is found without polling.
+    // Without playback, Discord itself restarts the search by launching Ruruka for an invitation.
     private static readonly TimeSpan ConnectRetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly SettingsStore _settings;
+    private readonly IBridgeEvents _events;
+    private readonly Action _onJoinRequested;
     private readonly Channel<bool> _wakeUps = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
     private readonly object _gate = new();
     private NowWatching? _watching;
+    private SessionInvite? _invite;
+    private string? _joinCode;
+    private volatile bool _isConnectDue;
     private DiscordIpcClient? _client;
     private DiscordActivity? _shown;
     private DateTimeOffset _nextConnectAt = DateTimeOffset.MinValue;
 
-    public DiscordPresence(SettingsStore settings)
+    /// <param name="onJoinRequested">Called on a background thread when an invitation was accepted on this PC.</param>
+    public DiscordPresence(SettingsStore settings, IBridgeEvents events, Action onJoinRequested)
     {
         _settings = settings;
+        _events = events;
+        _onJoinRequested = onJoinRequested;
         _ = Task.Run(RunAsync);
+        Refresh();
     }
 
     public void OnPlaybackChanged(PlaybackTarget target, PlaybackSyncPoint point)
@@ -48,6 +60,31 @@ internal sealed class DiscordPresence : IPlaybackListener
         Refresh();
     }
 
+    /// <summary>The session this PC hosts, or null once it closes.</summary>
+    public void SetInvite(SessionInvite? invite)
+    {
+        lock (_gate) _invite = invite;
+        Refresh();
+    }
+
+    /// <summary>The code of an invitation waiting for the UI, once.</summary>
+    public string? TakeJoinCode()
+    {
+        lock (_gate)
+        {
+            var code = _joinCode;
+            _joinCode = null;
+            return code;
+        }
+    }
+
+    /// <summary>Discord launched Ruruka for an invitation: looks for it at once, whatever the last attempt.</summary>
+    public void ConnectNow()
+    {
+        _isConnectDue = true;
+        Refresh();
+    }
+
     /// <summary>Applies the current playback and setting right away, such as the toggle in Settings.</summary>
     public void Refresh() => _wakeUps.Writer.TryWrite(true);
 
@@ -55,33 +92,46 @@ internal sealed class DiscordPresence : IPlaybackListener
     {
         await foreach (var _ in _wakeUps.Reader.ReadAllAsync())
         {
-            var activity = CurrentActivity();
-            if (activity is null)
+            if (!_settings.Current.IsDiscordPresenceShown)
             {
                 await DisconnectAsync();
                 _nextConnectAt = DateTimeOffset.MinValue;
                 continue;
             }
             if (_client is not { IsOpen: true } && !await TryConnectAsync()) continue;
-            if (activity.LooksLike(_shown)) continue;
-            if (await _client!.TrySetActivityAsync(activity)) _shown = activity;
+            var activity = CurrentActivity();
+            if (activity is null ? _shown is null : activity.LooksLike(_shown)) continue;
+            var isSent = await (activity is null ? _client!.TryClearActivityAsync() : _client!.TrySetActivityAsync(activity));
+            if (isSent) _shown = activity;
             await Task.Delay(MinUpdateInterval);
         }
     }
 
     private DiscordActivity? CurrentActivity()
     {
-        if (!_settings.Current.IsDiscordPresenceShown) return null;
-        lock (_gate) return _watching is { } watching ? DiscordActivity.From(watching, DateTimeOffset.UtcNow) : null;
+        lock (_gate)
+        {
+            if (_watching is { } watching) return DiscordActivity.From(watching, DateTimeOffset.UtcNow, _invite);
+            return _invite is { } invite ? DiscordActivity.ForOpenSession(invite) : null;
+        }
     }
 
     private async Task<bool> TryConnectAsync()
     {
         await DisconnectAsync();
-        if (DateTimeOffset.UtcNow < _nextConnectAt) return false;
+        if (!_isConnectDue && DateTimeOffset.UtcNow < _nextConnectAt) return false;
+        _isConnectDue = false;
         _nextConnectAt = DateTimeOffset.UtcNow + ConnectRetryDelay;
-        _client = await DiscordIpcClient.ConnectAsync(ApplicationId);
+        _client = await DiscordIpcClient.ConnectAsync(ApplicationId, HandleJoin);
         return _client is not null;
+    }
+
+    // <-- L'interface vient chercher le code : au démarrage, elle n'écoute pas encore quand Discord l'envoie -->
+    private void HandleJoin(string code)
+    {
+        lock (_gate) _joinCode = code;
+        _onJoinRequested();
+        _events.Emit("discord.joinRequested", new { });
     }
 
     private async Task DisconnectAsync()

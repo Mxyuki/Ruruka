@@ -63,6 +63,19 @@
     }
   }
 
+  // <-- Invitation Discord acceptée : rejoindre attend la session AniList, pour que l'hôte voie le bon pseudo -->
+  async function joinFromDiscord() {
+    if (session.status !== 'ready') return;
+    try {
+      const code = await invoke('discord.takeJoinCode');
+      if (!code) return;
+      await groupWatch.acceptInvite(code);
+      navigate('/group-watch');
+    } catch (error) {
+      toasts.error(error, 'Impossible de rejoindre cette séance');
+    }
+  }
+
   onMount(() => {
     document.addEventListener('auxclick', openLinkOnAniList);
     document.addEventListener('click', openLinkOnAniList);
@@ -79,6 +92,7 @@
       await invoke('window.readyToQuit');
     });
     on('window.mediaLinkOpened', openMediaLink);
+    on('discord.joinRequested', joinFromDiscord);
     void openMediaLink();
     const uninstallSparkles = installSparkles();
     const uninstallSpoilers = installSpoilers();
@@ -96,6 +110,7 @@
     untrack(() => {
       mediaList.load('ANIME').catch((error) => toasts.error(error, 'Impossible de charger ta liste d’anime'));
       void library.refresh();
+      void joinFromDiscord();
     });
   });
 </script>
