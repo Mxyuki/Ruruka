@@ -119,23 +119,14 @@ public class DiscordActivityTests
     }
 
     [Fact]
-    public void EpisodeReplacesTheAppNameWithTheAnime()
+    public void AppNameStaysAndTheStatusShowsTheAnime()
     {
         var payload = Payload(DiscordActivity.From(Watching(), Now));
 
-        Assert.Equal("Precure", payload.GetProperty("name").GetString());
-        Assert.Equal("Épisode 5", payload.GetProperty("details").GetString());
-        Assert.Equal(JsonValueKind.Null, payload.GetProperty("state").ValueKind);
-    }
-
-    [Fact]
-    public void WaitingSessionKeepsTheAppName()
-    {
-        var payload = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1)));
-
-        Assert.Equal(JsonValueKind.Null, payload.GetProperty("name").ValueKind);
-        Assert.Equal("Séance Ruruka", payload.GetProperty("details").GetString());
-        Assert.Equal("Séance ouverte", payload.GetProperty("state").GetString());
+        Assert.False(payload.TryGetProperty("name", out _));
+        Assert.Equal(2, payload.GetProperty("status_display_type").GetInt32());
+        Assert.Equal("Precure", payload.GetProperty("details").GetString());
+        Assert.Equal("Épisode 5", payload.GetProperty("state").GetString());
     }
 
     [Fact]
