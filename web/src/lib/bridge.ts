@@ -161,10 +161,12 @@ interface BridgeApi {
   /** Friend side: opens the local address fed by the UI and plays it. */
   'stream.play': [{ mediaId: number; episode: number; title: string; coverUrl: string; fileSize: number; extension: string }, boolean];
   'stream.closeViewer': [void, boolean];
-  /** Host side: offers the session to Discord invitations; a null code ends that. */
-  'discord.setInvite': [{ code: string | null; memberCount: number }, boolean];
+  /** The session as Discord should show it: `code` offers invitations when hosting, `companionNames` are the others in it. */
+  'discord.setSession': [{ code: string | null; memberCount: number; companionNames: string[] }, boolean];
   /** The code of an invitation accepted on this PC, once; null otherwise. */
   'discord.takeJoinCode': [void, string | null];
+  /** Host side: lets in someone who asked to join from Discord. */
+  'discord.acceptJoin': [{ userId: string }, boolean];
   'shell.openUrl': [{ url: string }, boolean];
   'shell.openPath': [{ path: string }, boolean];
   'shell.pickFolder': [{ title?: string }, string | null];
@@ -206,6 +208,8 @@ export interface BridgeEvents {
   'window.mediaLinkOpened': Record<string, never>;
   /** An invitation was accepted on this PC: collect it with "discord.takeJoinCode". */
   'discord.joinRequested': Record<string, never>;
+  /** Host side: someone asked to join from Discord; ignoring it lets the request expire. */
+  'discord.joinAsked': { userId: string; name: string };
 }
 
 type Method = keyof BridgeApi;

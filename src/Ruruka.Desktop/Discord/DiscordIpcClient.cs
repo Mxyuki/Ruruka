@@ -16,6 +16,7 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
     private const int PongOpcode = 4;
 
     private const string JoinEvent = "ACTIVITY_JOIN";
+    private const string JoinRequestEvent = "ACTIVITY_JOIN_REQUEST";
 
     private const int HeaderLength = 8;
     private const int MaxFrameLength = 1024 * 1024;
@@ -31,24 +32,27 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
     private readonly NamedPipeClientStream _pipe;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly Action<string> _onJoin;
+    private readonly Action<JoinAsked> _onJoinAsked;
     private volatile bool _isOpen = true;
 
-    private DiscordIpcClient(NamedPipeClientStream pipe, Action<string> onJoin)
+    private DiscordIpcClient(NamedPipeClientStream pipe, Action<string> onJoin, Action<JoinAsked> onJoinAsked)
     {
         _pipe = pipe;
         _onJoin = onJoin;
+        _onJoinAsked = onJoinAsked;
     }
 
     public bool IsOpen => _isOpen;
 
     /// <summary>The Discord app on this PC, or null when it isn't running.</summary>
     /// <param name="onJoin">Receives the join secret of an invitation accepted on this PC, on the reading thread.</param>
-    public static async Task<DiscordIpcClient?> ConnectAsync(string applicationId, Action<string> onJoin, string pipePrefix = DiscordPipePrefix)
+    /// <param name="onJoinAsked">Receives who asked to join the session hosted on this PC, on the reading thread.</param>
+    public static async Task<DiscordIpcClient?> ConnectAsync(string applicationId, Action<string> onJoin, Action<JoinAsked> onJoinAsked, string pipePrefix = DiscordPipePrefix)
     {
         for (var pipeNumber = 0; pipeNumber < PipeCount; pipeNumber++)
         {
             var pipe = new NamedPipeClientStream(".", $"{pipePrefix}{pipeNumber}", PipeDirection.InOut, PipeOptions.Asynchronous);
-            var client = new DiscordIpcClient(pipe, onJoin);
+            var client = new DiscordIpcClient(pipe, onJoin, onJoinAsked);
             try
             {
                 await pipe.ConnectAsync(PipeConnectTimeoutMs);
@@ -56,7 +60,8 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
                 if (await client.TryHandshakeAsync(applicationId, timeout.Token))
                 {
                     _ = client.ReadUntilClosedAsync();
-                    await client.TrySendAsync(FrameOpcode, new { cmd = "SUBSCRIBE", evt = JoinEvent, args = new { }, nonce = Guid.NewGuid() });
+                    await client.TrySubscribeAsync(JoinEvent);
+                    await client.TrySubscribeAsync(JoinRequestEvent);
                     return client;
                 }
             }
@@ -71,6 +76,10 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
 
     public Task<bool> TrySetActivityAsync(DiscordActivity activity) =>
         TrySendAsync(FrameOpcode, new { cmd = "SET_ACTIVITY", args = new { pid = Environment.ProcessId, activity = activity.ToPayload() }, nonce = Guid.NewGuid() });
+
+    /// <summary>Lets this person in: Discord gives them the join secret.</summary>
+    public Task<bool> TryAcceptJoinAsync(string userId) =>
+        TrySendAsync(FrameOpcode, new { cmd = "SEND_ACTIVITY_JOIN_INVITE", args = new { user_id = userId }, nonce = Guid.NewGuid() });
 
     /// <summary>Discord removes the activity when the app sends none.</summary>
     public Task<bool> TryClearActivityAsync() =>
@@ -92,6 +101,9 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
         body.CopyTo(frame, HeaderLength);
         return frame;
     }
+
+    private Task<bool> TrySubscribeAsync(string eventName) =>
+        TrySendAsync(FrameOpcode, new { cmd = "SUBSCRIBE", evt = eventName, args = new { }, nonce = Guid.NewGuid() });
 
     private async Task<bool> TryHandshakeAsync(string applicationId, CancellationToken cancellation)
     {
@@ -129,8 +141,16 @@ internal sealed class DiscordIpcClient : IAsyncDisposable
         var root = message.RootElement;
         if (!root.TryGetProperty("evt", out var eventName) || eventName.ValueKind != JsonValueKind.String) return;
         if (eventName.GetString() == "ERROR") Debug.WriteLine($"[discord] refused: {json}");
+        if (eventName.GetString() == JoinRequestEvent) _onJoinAsked(ToJoinAsked(root.GetProperty("data").GetProperty("user")));
         if (eventName.GetString() != JoinEvent) return;
         if (root.GetProperty("data").GetProperty("secret").GetString() is { } secret) _onJoin(secret);
+    }
+
+    private static JoinAsked ToJoinAsked(JsonElement user)
+    {
+        var hasDisplayName = user.TryGetProperty("global_name", out var displayName) && displayName.ValueKind == JsonValueKind.String;
+        var name = hasDisplayName ? displayName : user.GetProperty("username");
+        return new JoinAsked(user.GetProperty("id").GetString()!, name.GetString()!);
     }
 
     private async Task<(int Opcode, string Json)> ReadFrameAsync(CancellationToken cancellation)

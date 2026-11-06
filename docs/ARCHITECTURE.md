@@ -130,8 +130,9 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `window.takeMediaLink` | The anime of a waiting `ruruka://media/{id}` link, once; null otherwise. The UI asks at startup and on `window.mediaLinkOpened` |
-| `discord.setInvite` | Host: offer this session to Discord invitations; a null code ends that |
+| `discord.setSession` | The session as Discord shows it: the host's code for invitations (null otherwise) and the names of the others |
 | `discord.takeJoinCode` | The code of an invitation accepted on this PC, once; null otherwise. The UI asks once logged in and on `discord.joinRequested` |
+| `discord.acceptJoin` | Host: let in someone who asked to join from Discord |
 | `shell.openUrl` | Open an http(s) link in the default browser |
 | `shell.openPath` | Open a folder in Explorer or a video in its default app (nothing else, by design) |
 | `shell.pickFolder` / `shell.pickFile` | Native dialogs |
@@ -152,6 +153,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
 | `window.mediaLinkOpened` | `{}`. A `ruruka://` link reached the running app |
 | `discord.joinRequested` | `{}`. An invitation was accepted on this PC |
+| `discord.joinAsked` | `{ userId, name }`. Host: someone asked to join from Discord |
 | `window.closing` | `{}`. The app is really quitting; the UI answers with `window.readyToQuit` (the host waits 5 s at most) |
 
 The UI never navigates away from the app page. `MainForm` sends every outbound navigation
@@ -181,7 +183,7 @@ episode on `player.ended` rather than waiting for `player.closed`.
 
 **Discord activity.** Only the bundled player reports to `DiscordPresence`, through `IPlaybackListener`, and only while `AppSettings.IsDiscordPresenceShown` is on (default on). The listener belongs to the mpv session, so an episode loaded into that window keeps it. Each `player.sync` point wakes one worker that keeps only the latest state: Discord being slow or closed never holds up tracking, and no timer runs. It skips an update when the bar's end stays within 4 s (a pause, a seek or a new speed moves it), waits 4 s after each send (Discord allows 5 per 20 s) and tries to connect at most every 30 s. The pipe stays open while the app runs, because accepted invitations arrive on it. The activity is type Watching with start and end times, which draw Discord's time bar; a pause removes them and writes the time in the text. The AniList cover is the large image and the icon from the repository its small badge. With nothing to show, the activity is cleared; turning the setting off closes the pipe, which also ends invitations in both directions.
 
-**Discord invitations.** While a session is hosted, `groupWatch` calls `discord.setInvite` and the activity gains a party and a join secret, which is what makes Discord offer invitations from the chat's **+** menu. Discord refuses a join secret next to buttons, so « Ouvrir dans Ruruka » is gone until the session closes. A hosted session with nothing playing still gets an activity, since invitations need one, whichever player is chosen. The secret is the session code: Discord sees it and gives it to whoever accepts an invitation, and the public party id is only a hash of it. On the friend's side, `SUBSCRIBE ACTIVITY_JOIN` delivers the secret; `ACTIVITY_JOIN_REQUEST` is deliberately not subscribed, so « ask to join » from a profile lets nobody in. If Ruruka is closed, Discord opens the `discord-{applicationId}://` protocol that `MediaLink.Register` writes, and a second instance asks the running one to look for Discord at once.
+**Discord invitations.** While a hosted session waits with nothing playing, the activity is Playing with a party and a join secret, which is what makes Discord offer invitations from the chat's **+** menu. `groupWatch` keeps it current with `discord.setSession`, including when the session ends. An episode always takes over with the plain Watching activity (`DiscordActivity.ForNow`), so invitations are only available between episodes. Discord refuses a join secret next to buttons, so « Ouvrir dans Ruruka » is gone while waiting. A Watching activity with a join secret is accepted and even announced above the text box, but the **+** menu only offers Playing ones. With the user's own mpv Ruruka gets no position, so the session stays in its waiting activity during episodes. The secret is the session code: Discord sees it and gives it to whoever accepts an invitation, and the public party id is only a hash of it. On the friend's side, `SUBSCRIBE ACTIVITY_JOIN` delivers the secret. « Ask to join » reaches the host as `ACTIVITY_JOIN_REQUEST`: a toast, plus a tray notification when the window is in the background, offers to accept, which sends `SEND_ACTIVITY_JOIN_INVITE`. Anyone who can see the activity may ask, so nobody gets the code without that answer, and ignoring a request lets it expire. If Ruruka is closed, Discord opens the `discord-{applicationId}://` protocol that `MediaLink.Register` writes, and a second instance asks the running one to look for Discord at once.
 
 **Discord button.** The button opens `mxyuki.github.io/Ruruka/open/?media={id}`, which navigates to `ruruka://media/{id}`. A browser can't tell whether a protocol exists, so the page watches for losing focus to Ruruka or to the browser's « open this app? » prompt; without that within 2.5 s it replaces itself with the AniList page. A tab opened by Discord has one history entry, which lets `window.close()` work. `MediaLink.Register` writes the protocol under `HKCU\Software\Classes\ruruka` at each launch, except in development. Windows then starts a second Ruruka with the link: `Program` passes the id to the running instance through `pending-media-link.txt` and the show event. The id is the only thing read from a link, because any website can open one.
 
@@ -265,6 +267,8 @@ to reconnect, and only a closed session (`ended`, also sent when the app quits) 
 connection is retried 5 times with the same code. The topic is an HKDF hash of the code and every
 message is AES-GCM sealed with a key derived from it, so the public broker (where anyone can list topics)
 can neither read nor forge session messages.
+
+**Who is in the session.** The host alone hears friends arrive and leave, so its state carries `members`, and each Ruruka gives Discord the others' AniList names. They appear on hover: on the Ruruka badge, or on the large image when there is no cover. `DiscordActivity.DescribeCompanions` fits them in Discord's 128 characters.
 
 **Group watch modes.** The host picks how friends watch (`HostState.mode`): `screen` (shared elsewhere, as above), `files` or `stream`.
 In the last two, `player.sync` goes out on the non-retained `sync` channel, and a friend who follows the host passes each point to

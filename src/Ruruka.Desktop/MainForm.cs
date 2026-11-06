@@ -308,8 +308,9 @@ internal sealed class MainForm : Form
     private BridgeRouter CreateRouter(CoreWebView2 core, IBridgeEvents events)
     {
         var router = new BridgeRouter();
-        _presence = new DiscordPresence(_settings, events, () => BeginInvoke(ShowFromTray));
-        var player = new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray), _presence);
+        var notifier = new BackgroundPlaybackNotifier(events, this, _tray);
+        _presence = new DiscordPresence(_settings, notifier, () => BeginInvoke(ShowFromTray));
+        var player = new PlayerService(_settings, notifier, _presence);
         var stream = new StreamService(player, events);
         new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
         IBridgeModule[] modules =

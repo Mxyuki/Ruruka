@@ -41,6 +41,7 @@ public class DiscordIpcClientTests
         await ReadFrameAsync(server);
         await WriteFrameAsync(server, FrameOpcode, "{\"cmd\":\"DISPATCH\",\"evt\":\"READY\"}");
         await ReadFrameAsync(server);
+        await ReadFrameAsync(server);
     }
 
     [Fact]
@@ -50,16 +51,18 @@ public class DiscordIpcClientTests
         await using var server = FakeDiscord(prefix);
         var connection = server.WaitForConnectionAsync();
 
-        var connecting = DiscordIpcClient.ConnectAsync("42", _ => { }, prefix);
+        var connecting = DiscordIpcClient.ConnectAsync("42", _ => { }, _ => { }, prefix);
         await connection.WaitAsync(TestTimeout);
         var (handshakeOpcode, handshake) = await ReadFrameAsync(server).WaitAsync(TestTimeout);
         await WriteFrameAsync(server, FrameOpcode, "{\"cmd\":\"DISPATCH\",\"evt\":\"READY\"}");
         var (_, subscription) = await ReadFrameAsync(server).WaitAsync(TestTimeout);
+        var (_, requestSubscription) = await ReadFrameAsync(server).WaitAsync(TestTimeout);
         await using var client = await connecting.WaitAsync(TestTimeout);
 
         Assert.Equal(HandshakeOpcode, handshakeOpcode);
         Assert.Equal("42", JsonDocument.Parse(handshake).RootElement.GetProperty("client_id").GetString());
         Assert.Equal("ACTIVITY_JOIN", JsonDocument.Parse(subscription).RootElement.GetProperty("evt").GetString());
+        Assert.Equal("ACTIVITY_JOIN_REQUEST", JsonDocument.Parse(requestSubscription).RootElement.GetProperty("evt").GetString());
         Assert.NotNull(client);
 
         var watching = new NowWatching(123, 5, "Precure", null, 60, 1440, false);
@@ -81,12 +84,38 @@ public class DiscordIpcClientTests
         var secret = new TaskCompletionSource<string>();
         await using var server = FakeDiscord(prefix);
         var discord = AcceptHandshakeAsync(server);
-        await using var client = await DiscordIpcClient.ConnectAsync("42", code => secret.TrySetResult(code), prefix).WaitAsync(TestTimeout);
+        await using var client = await DiscordIpcClient.ConnectAsync("42", code => secret.TrySetResult(code), _ => { }, prefix).WaitAsync(TestTimeout);
         await discord.WaitAsync(TestTimeout);
 
         await WriteFrameAsync(server, FrameOpcode, "{\"cmd\":\"DISPATCH\",\"evt\":\"ACTIVITY_JOIN\",\"data\":{\"secret\":\"7KX3P-QM9TZ\"}}");
 
         Assert.Equal("7KX3P-QM9TZ", await secret.Task.WaitAsync(TestTimeout));
+    }
+
+    [Theory]
+    [InlineData("{\"id\":\"99\",\"username\":\"ruruka\",\"global_name\":\"Ruruka\"}", "Ruruka")]
+    [InlineData("{\"id\":\"99\",\"username\":\"ruruka\",\"global_name\":null}", "ruruka")]
+    [InlineData("{\"id\":\"99\",\"username\":\"ruruka\"}", "ruruka")]
+    public async Task JoinRequestNamesThePersonThenAcceptingSendsTheirId(string user, string expectedName)
+    {
+        var prefix = UniquePrefix();
+        var asked = new TaskCompletionSource<JoinAsked>();
+        await using var server = FakeDiscord(prefix);
+        var discord = AcceptHandshakeAsync(server);
+        await using var client = await DiscordIpcClient.ConnectAsync("42", _ => { }, request => asked.TrySetResult(request), prefix).WaitAsync(TestTimeout);
+        await discord.WaitAsync(TestTimeout);
+
+        await WriteFrameAsync(server, FrameOpcode, $"{{\"cmd\":\"DISPATCH\",\"evt\":\"ACTIVITY_JOIN_REQUEST\",\"data\":{{\"user\":{user}}}}}");
+        var request = await asked.Task.WaitAsync(TestTimeout);
+
+        Assert.Equal(new JoinAsked("99", expectedName), request);
+
+        var reading = ReadFrameAsync(server);
+        Assert.True(await client!.TryAcceptJoinAsync(request.UserId).WaitAsync(TestTimeout));
+        var message = JsonDocument.Parse((await reading.WaitAsync(TestTimeout)).Json).RootElement;
+
+        Assert.Equal("SEND_ACTIVITY_JOIN_INVITE", message.GetProperty("cmd").GetString());
+        Assert.Equal("99", message.GetProperty("args").GetProperty("user_id").GetString());
     }
 
     [Fact]
@@ -95,7 +124,7 @@ public class DiscordIpcClientTests
         var prefix = UniquePrefix();
         await using var server = FakeDiscord(prefix);
         var discord = AcceptHandshakeAsync(server);
-        await using var client = await DiscordIpcClient.ConnectAsync("42", _ => { }, prefix).WaitAsync(TestTimeout);
+        await using var client = await DiscordIpcClient.ConnectAsync("42", _ => { }, _ => { }, prefix).WaitAsync(TestTimeout);
         await discord.WaitAsync(TestTimeout);
 
         await WriteFrameAsync(server, PingOpcode, "{\"n\":1}");
@@ -111,7 +140,7 @@ public class DiscordIpcClientTests
         var prefix = UniquePrefix();
         await using var server = FakeDiscord(prefix);
         var discord = AcceptHandshakeAsync(server);
-        await using var client = await DiscordIpcClient.ConnectAsync("42", _ => { }, prefix).WaitAsync(TestTimeout);
+        await using var client = await DiscordIpcClient.ConnectAsync("42", _ => { }, _ => { }, prefix).WaitAsync(TestTimeout);
         await discord.WaitAsync(TestTimeout);
 
         await WriteFrameAsync(server, CloseOpcode, "{}");
@@ -123,6 +152,6 @@ public class DiscordIpcClientTests
     [Fact]
     public async Task NoDiscordGivesNoClient()
     {
-        Assert.Null(await DiscordIpcClient.ConnectAsync("42", _ => { }, UniquePrefix()));
+        Assert.Null(await DiscordIpcClient.ConnectAsync("42", _ => { }, _ => { }, UniquePrefix()));
     }
 }

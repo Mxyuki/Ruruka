@@ -119,9 +119,35 @@ public class DiscordActivityTests
     }
 
     [Fact]
+    public void EpisodeInASessionIsAPlainWatchingActivity()
+    {
+        var activity = DiscordActivity.ForNow(Watching(), new SessionInvite("7KX3P-QM9TZ", 2), null, Now);
+        var payload = Payload(activity!);
+
+        Assert.Equal(3, payload.GetProperty("type").GetInt32());
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("secrets").ValueKind);
+        Assert.Equal(JsonValueKind.Array, payload.GetProperty("buttons").ValueKind);
+        Assert.NotNull(activity!.EndsAtMs);
+    }
+
+    [Fact]
+    public void WaitingSessionIsPlayingSoDiscordOffersInvitations()
+    {
+        var activity = DiscordActivity.ForNow(null, new SessionInvite("7KX3P-QM9TZ", 1), null, Now);
+
+        Assert.Equal(0, Payload(activity!).GetProperty("type").GetInt32());
+    }
+
+    [Fact]
+    public void NothingToShowClearsTheActivity()
+    {
+        Assert.Null(DiscordActivity.ForNow(null, null, null, Now));
+    }
+
+    [Fact]
     public void HostedSessionTradesTheButtonForAnInvitation()
     {
-        var payload = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 3)));
+        var payload = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 3)));
 
         Assert.Equal(JsonValueKind.Null, payload.GetProperty("buttons").ValueKind);
         Assert.Equal("7KX3P-QM9TZ", payload.GetProperty("secrets").GetProperty("join").GetString());
@@ -133,7 +159,7 @@ public class DiscordActivityTests
     [Fact]
     public void PublicPartyIdDoesNotHoldTheCode()
     {
-        var party = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 1))).GetProperty("party");
+        var party = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1))).GetProperty("party");
 
         Assert.DoesNotContain("7KX3P", party.GetProperty("id").GetString());
     }
@@ -141,7 +167,7 @@ public class DiscordActivityTests
     [Fact]
     public void LargerSessionRaisesThePartySize()
     {
-        var size = Payload(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 14))).GetProperty("party").GetProperty("size");
+        var size = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 14))).GetProperty("party").GetProperty("size");
 
         Assert.Equal(14, size[1].GetInt32());
     }
@@ -149,9 +175,9 @@ public class DiscordActivityTests
     [Fact]
     public void NewFriendInTheSessionNeedsAnUpdate()
     {
-        var shown = DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 1));
+        var shown = DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1));
 
-        Assert.False(DiscordActivity.From(Watching(), Now, new SessionInvite("7KX3P-QM9TZ", 2)).LooksLike(shown));
+        Assert.False(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 2)).LooksLike(shown));
     }
 
     [Fact]
@@ -161,6 +187,58 @@ public class DiscordActivityTests
 
         Assert.Equal("7KX3P-QM9TZ", payload.GetProperty("secrets").GetProperty("join").GetString());
         Assert.Equal(DiscordActivity.IconUrl, payload.GetProperty("assets").GetProperty("large_image").GetString());
+    }
+
+    [Theory]
+    [InlineData(new string[0], null)]
+    [InlineData(new[] { "Alice" }, "Avec Alice")]
+    [InlineData(new[] { "Alice", "Bob" }, "Avec Alice et Bob")]
+    [InlineData(new[] { "Alice", "Bob", "Charlie" }, "Avec Alice, Bob et Charlie")]
+    public void CompanionsAreNamed(string[] names, string? expected)
+    {
+        Assert.Equal(expected, DiscordActivity.DescribeCompanions(names));
+    }
+
+    [Fact]
+    public void TooManyCompanionsAreCounted()
+    {
+        var names = Enumerable.Range(1, 30).Select(number => $"Detective{number:00}").ToList();
+
+        var text = DiscordActivity.DescribeCompanions(names)!;
+
+        Assert.InRange(text.Length, 1, 128);
+        Assert.Matches(@"^Avec Detective01, .* et \d+ autres$", text);
+    }
+
+    [Fact]
+    public void NameTooLongForDiscordIsNotShown()
+    {
+        Assert.Equal("Avec d'autres détectives", DiscordActivity.DescribeCompanions([new string('a', 200)]));
+    }
+
+    [Fact]
+    public void CompanionsAppearOnTheRurukaBadge()
+    {
+        var assets = Payload(DiscordActivity.ForNow(Watching(), null, "Avec Alice", Now)!).GetProperty("assets");
+
+        Assert.Equal("Avec Alice", assets.GetProperty("small_text").GetString());
+        Assert.Equal("Precure", assets.GetProperty("large_text").GetString());
+    }
+
+    [Fact]
+    public void WithoutCoverCompanionsAppearOnTheLargeImage()
+    {
+        var assets = Payload(DiscordActivity.ForNow(Watching(cover: null), null, "Avec Alice", Now)!).GetProperty("assets");
+
+        Assert.Equal("Avec Alice", assets.GetProperty("large_text").GetString());
+    }
+
+    [Fact]
+    public void FriendLeavingNeedsAnUpdate()
+    {
+        var shown = DiscordActivity.ForNow(Watching(), null, "Avec Alice et Bob", Now);
+
+        Assert.False(DiscordActivity.ForNow(Watching(), null, "Avec Alice", Now)!.LooksLike(shown));
     }
 
     [Fact]

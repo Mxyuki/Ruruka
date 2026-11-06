@@ -28,6 +28,7 @@ internal sealed class DiscordPresence : IPlaybackListener
     private readonly object _gate = new();
     private NowWatching? _watching;
     private SessionInvite? _invite;
+    private string? _companions;
     private string? _joinCode;
     private volatile bool _isConnectDue;
     private DiscordIpcClient? _client;
@@ -60,10 +61,14 @@ internal sealed class DiscordPresence : IPlaybackListener
         Refresh();
     }
 
-    /// <summary>The session this PC hosts, or null once it closes.</summary>
-    public void SetInvite(SessionInvite? invite)
+    /// <summary>The session this PC is in: the invitation when it hosts, and the others to name on hover.</summary>
+    public void SetSession(SessionInvite? invite, IReadOnlyList<string> companionNames)
     {
-        lock (_gate) _invite = invite;
+        lock (_gate)
+        {
+            _invite = invite;
+            _companions = DiscordActivity.DescribeCompanions(companionNames);
+        }
         Refresh();
     }
 
@@ -77,6 +82,10 @@ internal sealed class DiscordPresence : IPlaybackListener
             return code;
         }
     }
+
+    /// <summary>Accepts someone who asked to join from Discord; false when Discord is unreachable.</summary>
+    public async Task<bool> TryAcceptJoinAsync(string userId) =>
+        _client is { IsOpen: true } client && await client.TryAcceptJoinAsync(userId);
 
     /// <summary>Discord launched Ruruka for an invitation: looks for it at once, whatever the last attempt.</summary>
     public void ConnectNow()
@@ -109,11 +118,7 @@ internal sealed class DiscordPresence : IPlaybackListener
 
     private DiscordActivity? CurrentActivity()
     {
-        lock (_gate)
-        {
-            if (_watching is { } watching) return DiscordActivity.From(watching, DateTimeOffset.UtcNow, _invite);
-            return _invite is { } invite ? DiscordActivity.ForOpenSession(invite) : null;
-        }
+        lock (_gate) return DiscordActivity.ForNow(_watching, _invite, _companions, DateTimeOffset.UtcNow);
     }
 
     private async Task<bool> TryConnectAsync()
@@ -122,7 +127,7 @@ internal sealed class DiscordPresence : IPlaybackListener
         if (!_isConnectDue && DateTimeOffset.UtcNow < _nextConnectAt) return false;
         _isConnectDue = false;
         _nextConnectAt = DateTimeOffset.UtcNow + ConnectRetryDelay;
-        _client = await DiscordIpcClient.ConnectAsync(ApplicationId, HandleJoin);
+        _client = await DiscordIpcClient.ConnectAsync(ApplicationId, HandleJoin, asked => _events.Emit("discord.joinAsked", asked));
         return _client is not null;
     }
 

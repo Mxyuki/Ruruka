@@ -85,6 +85,8 @@ interface HostState {
   stream: StreamedFile | null;
   /** Friends allowed to pause and seek for everyone. */
   controllerIds: string[];
+  /** Who is in the session besides the host; empty from a host on an older version. */
+  members: Friend[];
 }
 
 interface FriendNotice {
@@ -106,6 +108,7 @@ export interface RemoteSession {
   mode: WatchMode;
   stream: StreamedFile | null;
   controllerIds: string[];
+  members: Friend[];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -125,14 +128,22 @@ function asStreamedFile(value: unknown): StreamedFile | null {
   return { fileKey, fileSize, extension };
 }
 
+function asMembers(value: unknown): Friend[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((member: unknown) => {
+    if (!isRecord(member) || typeof member.friendId !== 'string' || typeof member.name !== 'string') return [];
+    return [{ friendId: member.friendId, name: member.name }];
+  });
+}
+
 function asHostState(value: unknown): HostState | null {
   if (!isRecord(value)) return null;
-  const { status, hostName, connectionId, shared, mode, stream, controllerIds } = value;
+  const { status, hostName, connectionId, shared, mode, stream, controllerIds, members } = value;
   if (status !== 'playing' && status !== 'idle' && status !== 'lost' && status !== 'ended') return null;
   if (typeof hostName !== 'string' || typeof connectionId !== 'string') return null;
   const knownMode: WatchMode = mode === 'files' || mode === 'stream' ? mode : 'screen';
   const knownControllerIds = Array.isArray(controllerIds) ? controllerIds.filter((id): id is string => typeof id === 'string') : [];
-  return { status, hostName, connectionId, shared: asSharedEpisode(shared), mode: knownMode, stream: asStreamedFile(stream), controllerIds: knownControllerIds };
+  return { status, hostName, connectionId, shared: asSharedEpisode(shared), mode: knownMode, stream: asStreamedFile(stream), controllerIds: knownControllerIds, members: asMembers(members) };
 }
 
 function asControlMessage(value: unknown): ControlMessage | null {
@@ -232,6 +243,7 @@ class GroupWatch {
   }
 
   init(): void {
+    on('discord.joinAsked', (asked) => this.offerJoin(asked));
     on('player.started', ({ mediaId, episode }) => {
       this.share({ mediaId, episode, positionSeconds: 0, durationSeconds: 0, isWatched: false });
       if (this.role === 'hosting' && this.mode === 'stream') this.streamHooks?.onHostEpisodeStarted();
@@ -347,16 +359,41 @@ class GroupWatch {
       this.isReconnecting = false;
       if (role === 'hosting') await this.publishHostState();
       else await this.room.publish(friendsChannel, this.notice('join'), false);
-      this.updateDiscordInvite();
+      this.updateDiscordSession();
     } finally {
       this.isConnecting = false;
     }
   }
 
-  // <-- L'hôte peut inviter depuis Discord tant que sa séance existe -->
-  private updateDiscordInvite(): void {
+  // <-- Discord envoie la demande à tout le profil visible : rien n'entre sans l'accord de l'hôte -->
+  private offerJoin({ userId, name }: { userId: string; name: string }): void {
+    if (this.role !== 'hosting') return;
+    toasts.show(`${name} demande à rejoindre ta séance.`, 'info', {
+      label: 'Accepter',
+      run: () => {
+        invoke('discord.acceptJoin', { userId }).catch((error: unknown) => toasts.error(error, 'Impossible d’accepter cette demande'));
+      },
+    });
+  }
+
+  // <-- Discord nomme les autres au survol : l'hôte seul connaît la séance, chacun la reçoit par son état -->
+  private companionNames(): string[] {
+    if (this.role === 'hosting') return this.friends.map((friend) => friend.name);
+    if (!this.remote) return [];
+    const others = this.remote.members.filter((member) => member.friendId !== this.friendId);
+    return [this.remote.hostName, ...others.map((member) => member.name)];
+  }
+
+  private updateDiscordSession(): void {
     const code = this.role === 'hosting' ? this.code : null;
-    invoke('discord.setInvite', { code, memberCount: this.friends.length + 1 }).catch((error: unknown) => toasts.error(error, 'Impossible de préparer les invitations Discord'));
+    invoke('discord.setSession', { code, memberCount: this.friends.length + 1, companionNames: this.companionNames() }).catch((error: unknown) =>
+      toasts.error(error, 'Impossible de mettre à jour la séance sur Discord'),
+    );
+  }
+
+  private announceFriends(): void {
+    this.updateDiscordSession();
+    void this.publishHostState();
   }
 
   // <-- Coupure réseau : on retente quelques fois avec le même code, la séance n'est pas finie pour autant -->
@@ -394,6 +431,7 @@ class GroupWatch {
     this.streamedFile = null;
     this.syncOffsetSeconds = 0;
     this.controllerIds = [];
+    this.updateDiscordSession();
     this.ignoreHostUntil = 0;
   }
 
@@ -480,6 +518,7 @@ class GroupWatch {
       mode: this.mode,
       stream: this.streamedFile,
       controllerIds: this.controllerIds,
+      members: this.friends,
     };
   }
 
@@ -507,13 +546,13 @@ class GroupWatch {
     if (notice.type === 'leave') {
       if (!isNew) toasts.show(`${notice.name} a quitté la séance.`, 'info');
       this.friends = others;
-      this.updateDiscordInvite();
+      this.announceFriends();
       if (this.isController(notice.friendId)) this.setController(notice.friendId, false);
       return;
     }
     if (isNew) toasts.show(`${notice.name} a rejoint la séance !`, 'info');
     this.friends = [...others, { friendId: notice.friendId, name: notice.name }];
-    this.updateDiscordInvite();
+    this.announceFriends();
   }
 
   // <-- Les états sont traités dans l'ordre d'arrivée, même quand il faut d'abord charger l'anime -->
@@ -538,7 +577,8 @@ class GroupWatch {
     }
     const previous = this.remote?.shared;
     if (state.status !== 'playing' || !state.shared) {
-      this.remote = { hostName: state.hostName, status: state.status, shared: null, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds };
+      this.remote = { hostName: state.hostName, status: state.status, shared: null, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds, members: state.members };
+      this.updateDiscordSession();
       this.stopFollowing();
       return;
     }
@@ -546,7 +586,8 @@ class GroupWatch {
     const shared = state.shared;
     const media = previous?.mediaId === shared.mediaId ? previous.media : await mediaFor(shared.mediaId);
     if (this.role !== 'joined') return;
-    this.remote = { hostName: state.hostName, status: state.status, shared: { ...shared, media }, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds };
+    this.remote = { hostName: state.hostName, status: state.status, shared: { ...shared, media }, mode: state.mode, stream: state.stream, controllerIds: state.controllerIds, members: state.members };
+    this.updateDiscordSession();
     await this.followNextEpisode(previous, media);
     if (!playback.followRemote(media, shared.episode)) return;
     liveAbout.trackPosition({ mediaId: shared.mediaId, episode: shared.episode, positionSeconds: shared.positionSeconds, durationSeconds: shared.durationSeconds });
