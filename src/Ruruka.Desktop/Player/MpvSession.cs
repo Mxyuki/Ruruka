@@ -6,7 +6,8 @@ using Ruruka.Desktop.Bridge;
 
 namespace Ruruka.Desktop.Player;
 
-public sealed record PlaybackTarget(int MediaId, int Episode, string FilePath, string Title);
+/// <param name="CoverUrl">AniList cover shown on Discord; null keeps the Ruruka icon.</param>
+public sealed record PlaybackTarget(int MediaId, int Episode, string FilePath, string Title, string? CoverUrl = null);
 
 /// <summary>Payload of "player.watched": the episode crossed the watched threshold.</summary>
 public sealed record EpisodeWatched(int MediaId, int Episode, string Title);
@@ -20,8 +21,19 @@ public sealed record PlaybackSyncPoint(int MediaId, int Episode, double Position
 /// <summary>Payload of "player.userControl": the person at this player paused or seeked, as opposed to a sync correction.</summary>
 public sealed record PlaybackUserControl(int MediaId, int Episode, double? PositionSeconds, bool? IsPaused);
 
+/// <summary>Told about one player's playback on mpv's own thread, so it must return at once.</summary>
+public interface IPlaybackListener
+{
+    void OnPlaybackChanged(PlaybackTarget target, PlaybackSyncPoint point);
+
+    void OnPlaybackClosed(PlaybackTarget target);
+}
+
 /// <summary>How to start mpv: which executable, and the bundled Ruruka config when it is the bundled player.</summary>
-internal sealed record MpvLaunch(string ExecutablePath, string? ConfigDirectory);
+internal sealed record MpvLaunch(string ExecutablePath, string? ConfigDirectory)
+{
+    public bool IsBundled => ConfigDirectory is not null;
+}
 
 /// <summary>
 /// Runs one mpv process and follows its playback through mpv's JSON IPC over a named pipe.
@@ -44,6 +56,7 @@ internal sealed class MpvSession
     private const int PositionRequestId = 2;
 
     private readonly IBridgeEvents _events;
+    private readonly IPlaybackListener? _listener;
     private readonly Process _process;
     private readonly string _pipeName = $"ruruka-mpv-{Guid.NewGuid():N}";
     private readonly Stopwatch _sinceProgress = new();
@@ -73,11 +86,12 @@ internal sealed class MpvSession
     // Episodes sent with loadfile that mpv hasn't opened yet; until then, positions still belong to the previous file.
     private int _pendingLoads;
 
-    private MpvSession(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
+    private MpvSession(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, IPlaybackListener? listener, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
     {
         _target = target;
         _tracker = tracker;
         _events = events;
+        _listener = listener;
         var startInfo = new ProcessStartInfo(launch.ExecutablePath) { UseShellExecute = false };
         startInfo.ArgumentList.Add(IpcServerArgument(_pipeName));
         if (launch.ConfigDirectory is not null) startInfo.ArgumentList.Add($"--config-dir={launch.ConfigDirectory}");
@@ -100,11 +114,12 @@ internal sealed class MpvSession
     private static string WindowTitle(PlaybackTarget target) => $"{target.Title} - Episode {target.Episode}";
 
     /// <summary>Starts mpv and tracks it in the background until it exits.</summary>
+    /// <param name="listener">Follows this window's playback, whichever episode it plays.</param>
     /// <param name="isKeptOpen">mpv stays on the last frame instead of quitting when the episode ends.</param>
     /// <param name="options">mpv options for this file, such as the cache of a stream.</param>
-    public static MpvSession Start(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
+    public static MpvSession Start(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, IPlaybackListener? listener, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
     {
-        var session = new MpvSession(launch, target, tracker, events, isKeptOpen, options);
+        var session = new MpvSession(launch, target, tracker, events, listener, isKeptOpen, options);
         session._process.Start();
         events.Emit("player.started", new { target.MediaId, target.Episode });
         _ = session.TrackAsync();
@@ -241,6 +256,7 @@ internal sealed class MpvSession
             {
                 _hasExited = true;
                 _events.Emit("player.closed", new { _target.MediaId, _target.Episode, _tracker.WatchedRatio });
+                _listener?.OnPlaybackClosed(_target);
             }
             _process.Dispose();
         }
@@ -412,7 +428,9 @@ internal sealed class MpvSession
     private void ReportSync()
     {
         _sinceSync.Restart();
-        _events.Emit("player.sync", new PlaybackSyncPoint(_target.MediaId, _target.Episode, _lastPosition, _tracker.DurationSeconds, _isPaused));
+        var point = new PlaybackSyncPoint(_target.MediaId, _target.Episode, _lastPosition, _tracker.DurationSeconds, _isPaused);
+        _events.Emit("player.sync", point);
+        _listener?.OnPlaybackChanged(_target, point);
     }
 
     // With keep-open, mpv stays on the last frame, so the end of the episode is reported here rather than by "player.closed".

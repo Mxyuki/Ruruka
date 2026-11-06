@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Ruruka</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/Mxyuki/Ruruka/main/assets/icon.png">
+  <style>
+    /* <-- Mêmes jetons que web/src/styles/tokens.css : cette page vit hors de l'app --> */
+    :root {
+      --colorMilk: #fbf7ef;
+      --colorPaper: #ffffff;
+      --colorInk: #2b1e30;
+      --textMain: #2b1e30;
+      --textSoft: #5e3f61;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --colorMilk: #1b1520;
+        --colorPaper: #282030;
+        --colorInk: #09060b;
+        --textMain: #f3ecf5;
+        --textSoft: #cdb9d6;
+      }
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+      background: var(--colorMilk);
+      color: var(--textMain);
+      font-family: Nunito, "Segoe UI", sans-serif;
+      text-align: center;
+    }
+
+    main {
+      max-width: 340px;
+      padding: 24px;
+      border: 2px solid var(--colorInk);
+      border-radius: 14px;
+      background: var(--colorPaper);
+      box-shadow: 5px 5px 0 var(--colorInk);
+      transform: rotate(-1deg);
+    }
+
+    img {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+    }
+
+    p {
+      margin: 12px 0 0;
+    }
+
+    a {
+      color: var(--textSoft);
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="https://raw.githubusercontent.com/Mxyuki/Ruruka/main/assets/icon.png" alt="Ruruka">
+    <p id="message">On cherche Ruruka sur ton ordinateur…</p>
+    <p><a id="aniList" href="https://anilist.co">Voir sur AniList</a></p>
+  </main>
+
+  <script>
+    // <-- Un navigateur ne dit jamais si un protocole est installé : seule la perte de focus trahit Ruruka ou sa demande d'ouverture -->
+    const fallbackDelayMs = 2500;
+    const promptAnswerDelayMs = 10000;
+    const closeAfterFocusMs = 300;
+
+    const mediaId = new URLSearchParams(location.search).get('media');
+    const isMediaId = /^\d{1,9}$/.test(mediaId ?? '');
+    const aniListUrl = isMediaId ? `https://anilist.co/anime/${mediaId}` : 'https://anilist.co';
+    const aniListLink = document.getElementById('aniList');
+    const message = document.getElementById('message');
+    aniListLink.href = aniListUrl;
+
+    let fallbackTimer = 0;
+    let hasFoundRuruka = false;
+
+    // <-- Un onglet ouvert par Discord n'a qu'une page d'historique : le navigateur le laisse se fermer seul -->
+    function closePage() {
+      message.textContent = 'Ruruka a pris le relais, tu peux fermer cet onglet.';
+      window.close();
+    }
+
+    function handleRurukaFound() {
+      if (hasFoundRuruka) return;
+      hasFoundRuruka = true;
+      clearTimeout(fallbackTimer);
+      setTimeout(closePage, promptAnswerDelayMs);
+      window.addEventListener('focus', () => setTimeout(closePage, closeAfterFocusMs));
+    }
+
+    // <-- Firefox remplace la page par une erreur si le protocole est inconnu : il passe par un cadre caché -->
+    function openRuruka() {
+      const link = `ruruka://media/${mediaId}`;
+      if (!navigator.userAgent.includes('Firefox')) {
+        location.href = link;
+        return;
+      }
+      const frame = document.createElement('iframe');
+      frame.hidden = true;
+      frame.src = link;
+      document.body.append(frame);
+    }
+
+    function start() {
+      window.addEventListener('blur', handleRurukaFound);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) handleRurukaFound();
+      });
+      fallbackTimer = setTimeout(() => location.replace(aniListUrl), fallbackDelayMs);
+      openRuruka();
+    }
+
+    // <-- Une page chargée sans le focus perdrait le seul signal : on attend que le navigateur passe devant -->
+    if (!isMediaId) {
+      location.replace(aniListUrl);
+    } else if (document.hasFocus()) {
+      start();
+    } else {
+      window.addEventListener('focus', start, { once: true });
+    }
+  </script>
+</body>
+</html>

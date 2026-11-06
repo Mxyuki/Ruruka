@@ -40,6 +40,9 @@ son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** qua
   ton mpv et sa configuration, tu le choisis dans les réglages.
 - **Lecture et progression automatique.** Arrivé à 85 % de l'épisode, ta liste se met à jour. Tu peux passer les génériques tant que tu as vraiment vu la moitié de l'épisode ; les deux seuils se règlent.
   Elle ne recule jamais : si tu revois un vieil épisode, ta progression ne bouge pas.
+- **Ton épisode sur Discord.** Avec le lecteur Ruruka, ton profil montre l'anime, l'épisode et le temps
+  regardé, avec l'image de l'anime. Le bouton ouvre l'anime dans Ruruka pour tes amis qui l'ont, sur AniList
+  pour les autres. Tu peux le couper dans les réglages.
 - **Une seule fenêtre pour toute la soirée.** À la fin d'un épisode, le lecteur reste ouvert ; lance
   le suivant et il s'ouvre dans la même fenêtre, avec le même suivi. Pratique pour regarder entre
   amis en partage d'écran sur Discord.

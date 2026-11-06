@@ -4,6 +4,7 @@ using Microsoft.Web.WebView2.WinForms;
 using Ruruka.Desktop.Bridge;
 using Ruruka.Desktop.Bridge.Modules;
 using Ruruka.Desktop.Calendar;
+using Ruruka.Desktop.Discord;
 using Ruruka.Desktop.Library;
 using Ruruka.Desktop.Manga;
 using Ruruka.Desktop.Player;
@@ -32,6 +33,8 @@ internal sealed class MainForm : Form
     private CoreWebView2Environment? _environment;
     private bool _isExiting;
     private BridgeHost? _bridge;
+    private DiscordPresence? _presence;
+    private int? _pendingMediaLink;
     private bool _isUiFinished;
     private bool _isDark;
     private bool _isWaitingForUi;
@@ -44,12 +47,14 @@ internal sealed class MainForm : Form
     /// <summary>An installer downloaded by <c>update.install</c>, launched once the app has fully quit.</summary>
     public string? PendingInstaller { get; private set; }
 
+    /// <param name="mediaLink">The anime of the ruruka:// link that started the app.</param>
     /// <param name="isStartingHidden">Launched by Windows at sign-in: stay in the notification area until opened.</param>
-    public MainForm(SettingsStore settings, LinkStore links, CalendarStore calendar, bool isStartingHidden)
+    public MainForm(SettingsStore settings, LinkStore links, CalendarStore calendar, int? mediaLink, bool isStartingHidden)
     {
         _settings = settings;
         _links = links;
         _calendar = calendar;
+        _pendingMediaLink = mediaLink;
         _isStartingHidden = isStartingHidden;
 
         Text = "Ruruka";
@@ -73,6 +78,23 @@ internal sealed class MainForm : Form
         Show();
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
+    }
+
+    /// <summary>A second Ruruka was started: shows the window and passes on the link it may have left.</summary>
+    public void ShowForOtherInstance()
+    {
+        ShowFromTray();
+        if (MediaLink.TakeLeftByOtherInstance() is not { } mediaId) return;
+        _pendingMediaLink = mediaId;
+        _bridge?.Emit("window.mediaLinkOpened", new { });
+    }
+
+    // <-- L'interface vient chercher le lien : au démarrage, elle n'écoute pas encore quand le lien arrive -->
+    private int? TakeMediaLink()
+    {
+        var mediaId = _pendingMediaLink;
+        _pendingMediaLink = null;
+        return mediaId;
     }
 
     // <-- Au démarrage de Windows, la fenêtre reste cachée : WebView2 ne se charge qu'à la première ouverture -->
@@ -247,6 +269,7 @@ internal sealed class MainForm : Form
     {
         ApplyInterfaceScale();
         ApplyTheme();
+        _presence?.Refresh();
     }
 
     private async Task InitializeWebViewAsync()
@@ -284,7 +307,8 @@ internal sealed class MainForm : Form
     private BridgeRouter CreateRouter(CoreWebView2 core, IBridgeEvents events)
     {
         var router = new BridgeRouter();
-        var player = new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray));
+        _presence = new DiscordPresence(_settings);
+        var player = new PlayerService(_settings, new BackgroundPlaybackNotifier(events, this, _tray), _presence);
         var stream = new StreamService(player, events);
         new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
         IBridgeModule[] modules =
@@ -296,7 +320,7 @@ internal sealed class MainForm : Form
             new PlayerModule(player),
             new StreamModule(stream),
             new ShellModule(this),
-            new WindowModule(this, () => _uiFinishedSignal.TrySetResult()),
+            new WindowModule(this, () => _uiFinishedSignal.TrySetResult(), TakeMediaLink),
             new UpdateModule(new UpdateService(), QuitForUpdate),
             new MangaModule(new MangaSiteClient(_settings)),
         ];

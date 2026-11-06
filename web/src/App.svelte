@@ -11,8 +11,8 @@
   import UpdateDialog from './components/UpdateDialog.svelte';
   import { fetchMediaSiteUrl } from './api/queries/media';
   import { invoke, on } from './lib/bridge';
-  import { router } from './lib/router.svelte';
-  import { anilistUrlFor, routes, userListPath } from './lib/routes';
+  import { navigate, router } from './lib/router.svelte';
+  import { anilistUrlFor, mediaPath, routes, userListPath } from './lib/routes';
   import { installSparkles } from './lib/sparkle';
   import { installSpoilers } from './lib/spoilers';
   import SetupPage from './pages/setup/SetupPage.svelte';
@@ -53,6 +53,16 @@
     }
   }
 
+  // <-- Bouton Discord : l'anime du lien ruruka:// s'ouvre au démarrage comme dans l'app déjà lancée -->
+  async function openMediaLink() {
+    try {
+      const mediaId = await invoke('window.takeMediaLink');
+      if (mediaId) navigate(mediaPath(mediaId));
+    } catch (error) {
+      toasts.error(error, 'Impossible d’ouvrir cet anime');
+    }
+  }
+
   onMount(() => {
     document.addEventListener('auxclick', openLinkOnAniList);
     document.addEventListener('click', openLinkOnAniList);
@@ -68,6 +78,8 @@
       await liveAbout.publishIdle();
       await invoke('window.readyToQuit');
     });
+    on('window.mediaLinkOpened', openMediaLink);
+    void openMediaLink();
     const uninstallSparkles = installSparkles();
     const uninstallSpoilers = installSpoilers();
     return () => {

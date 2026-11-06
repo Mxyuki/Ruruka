@@ -86,7 +86,8 @@ class Playback {
   async playStream(media: MediaSummary, episode: number, file: SharedFile): Promise<boolean> {
     this.playlist = null;
     const title = media.title.userPreferred;
-    return this.launch(media, episode, true, () => invoke('stream.play', { mediaId: media.id, episode, title, ...file }));
+    const coverUrl = media.coverImage.large;
+    return this.launch(media, episode, true, () => invoke('stream.play', { mediaId: media.id, episode, title, coverUrl, ...file }));
   }
 
   private async play(media: MediaSummary, episode: number, isShared = false): Promise<boolean> {
@@ -96,7 +97,8 @@ class Playback {
       return false;
     }
     const title = media.title.userPreferred;
-    return this.launch(media, episode, isShared, () => invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title }));
+    const coverUrl = media.coverImage.large;
+    return this.launch(media, episode, isShared, () => invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title, coverUrl }));
   }
 
   private async launch(media: MediaSummary, episode: number, isShared: boolean, start: () => Promise<boolean>): Promise<boolean> {

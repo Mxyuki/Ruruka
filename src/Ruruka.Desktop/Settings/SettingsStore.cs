@@ -32,6 +32,7 @@ public sealed class SettingsStore
         IsCloseToTray = patch.IsCloseToTray ?? settings.IsCloseToTray,
         IsLaunchedAtStartup = patch.IsLaunchedAtStartup ?? settings.IsLaunchedAtStartup,
         IsPlayerKeptOpen = patch.IsPlayerKeptOpen ?? settings.IsPlayerKeptOpen,
+        IsDiscordPresenceShown = patch.IsDiscordPresenceShown ?? settings.IsDiscordPresenceShown,
         EpisodeCompletionPercent = patch.EpisodeCompletionPercent ?? settings.EpisodeCompletionPercent,
         MinimumWatchedPercent = patch.MinimumWatchedPercent ?? settings.MinimumWatchedPercent,
         CompareCacheMinutes = patch.CompareCacheMinutes ?? settings.CompareCacheMinutes,

@@ -2,9 +2,10 @@ using Ruruka.Desktop.Windowing;
 
 namespace Ruruka.Desktop.Bridge.Modules;
 
-/// <summary>The buttons and drag area of the title bar drawn by the UI, and the quit handshake.</summary>
+/// <summary>The buttons and drag area of the title bar drawn by the UI, the quit handshake and opened links.</summary>
 /// <param name="onReadyToQuit">Called once the UI has finished its work after "window.closing".</param>
-internal sealed class WindowModule(Form window, Action onReadyToQuit) : IBridgeModule
+/// <param name="takeMediaLink">The anime of a ruruka:// link waiting for the UI, once.</param>
+internal sealed class WindowModule(Form window, Action onReadyToQuit, Func<int?> takeMediaLink) : IBridgeModule
 {
     public void Register(BridgeRouter router)
     {
@@ -18,6 +19,7 @@ internal sealed class WindowModule(Form window, Action onReadyToQuit) : IBridgeM
             onReadyToQuit();
             return Task.FromResult(true);
         });
+        router.Register("window.takeMediaLink", () => Task.FromResult(takeMediaLink()));
     }
 
     private void ToggleMaximize() =>

@@ -5,7 +5,7 @@ namespace Ruruka.Desktop.Player;
 
 public sealed record PlayerStatus(string? MpvPath, bool IsInstalled, bool IsBundledPlayerAvailable);
 
-public sealed class PlayerService(SettingsStore settings, IBridgeEvents events)
+public sealed class PlayerService(SettingsStore settings, IBridgeEvents events, IPlaybackListener bundledPlayerListener)
 {
     // <-- Lecture à la demande pendant la séance : assez d'avance pour une coupure, rien d'écrit sur le disque de l'ami -->
     private static readonly Dictionary<string, string> StreamOptions = new()
@@ -67,7 +67,8 @@ public sealed class PlayerService(SettingsStore settings, IBridgeEvents events)
 
         // <-- Une fenêtre mpv déjà ouverte reçoit le nouvel épisode : un partage d'écran Discord continue sans coupure -->
         if (_session is { } open && await open.TryLoadAsync(target, tracker, options)) return;
-        _session = MpvSession.Start(launch, target, tracker, events, current.IsPlayerKeptOpen, options);
+        var listener = launch.IsBundled ? bundledPlayerListener : null;
+        _session = MpvSession.Start(launch, target, tracker, events, listener, current.IsPlayerKeptOpen, options);
     }
 
     // <-- Un choix impossible à honorer retombe sur l'autre lecteur plutôt que de bloquer l'épisode -->

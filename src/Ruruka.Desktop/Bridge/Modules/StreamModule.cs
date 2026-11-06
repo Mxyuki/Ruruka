@@ -14,7 +14,7 @@ internal sealed class StreamModule(StreamService stream) : IBridgeModule
         });
         router.Register<OpenParams, bool>("stream.play", async parameters =>
         {
-            await stream.PlayAsync(parameters.MediaId, parameters.Episode, parameters.Title, parameters.FileSize, parameters.Extension);
+            await stream.PlayAsync(parameters.MediaId, parameters.Episode, parameters.Title, parameters.CoverUrl, parameters.FileSize, parameters.Extension);
             return true;
         });
         router.Register("stream.closeViewer", () =>
@@ -24,5 +24,5 @@ internal sealed class StreamModule(StreamService stream) : IBridgeModule
         });
     }
 
-    private sealed record OpenParams(int MediaId, int Episode, string Title, long FileSize, string Extension);
+    private sealed record OpenParams(int MediaId, int Episode, string Title, string? CoverUrl, long FileSize, string Extension);
 }

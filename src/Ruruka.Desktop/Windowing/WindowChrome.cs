@@ -65,6 +65,15 @@ internal static partial class WindowChrome
         public int Bottom;
     }
 
+    /// <summary>Lets the running Ruruka come in front of the browser that opened this process.</summary>
+    public static void AllowForegroundForOtherInstance() => AllowSetForegroundWindow(AnyProcess);
+
+    private const int AnyProcess = -1;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool AllowSetForegroundWindow(int processId);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool ReleaseCapture();

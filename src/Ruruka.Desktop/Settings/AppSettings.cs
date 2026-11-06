@@ -31,6 +31,9 @@ public sealed record AppSettings
     /// <summary>mpv stays open on the last frame of an episode, so the next one plays in the same window.</summary>
     public bool IsPlayerKeptOpen { get; init; } = true;
 
+    /// <summary>The Ruruka player shows the anime, episode and time on the Discord profile.</summary>
+    public bool IsDiscordPresenceShown { get; init; } = true;
+
     /// <summary>How far into an episode (in %) playback must reach before it counts as watched.</summary>
     public int EpisodeCompletionPercent { get; init; } = 85;
 
@@ -82,6 +85,7 @@ public sealed record AppSettings
         IsCloseToTray,
         IsLaunchedAtStartup,
         IsPlayerKeptOpen,
+        IsDiscordPresenceShown,
         EpisodeCompletionPercent,
         MinimumWatchedPercent,
         CompareCacheMinutes,
@@ -110,6 +114,7 @@ public sealed record PublicSettings(
     bool IsCloseToTray,
     bool IsLaunchedAtStartup,
     bool IsPlayerKeptOpen,
+    bool IsDiscordPresenceShown,
     int EpisodeCompletionPercent,
     int MinimumWatchedPercent,
     int CompareCacheMinutes,
@@ -137,6 +142,7 @@ public sealed record SettingsPatch
     public bool? IsCloseToTray { get; init; }
     public bool? IsLaunchedAtStartup { get; init; }
     public bool? IsPlayerKeptOpen { get; init; }
+    public bool? IsDiscordPresenceShown { get; init; }
     public int? EpisodeCompletionPercent { get; init; }
     public int? MinimumWatchedPercent { get; init; }
     public int? CompareCacheMinutes { get; init; }

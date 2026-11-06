@@ -21,6 +21,8 @@ export interface Settings {
   isLaunchedAtStartup: boolean;
   /** mpv stays open on the last frame of an episode, so the next one plays in the same window. */
   isPlayerKeptOpen: boolean;
+  /** The Ruruka player shows the anime, episode and time on the Discord profile. */
+  isDiscordPresenceShown: boolean;
   /** How far into an episode (in %) playback must reach before it counts as watched. */
   episodeCompletionPercent: number;
   /** The share of an episode (in %) that must really be played; the rest may be skipped. */
@@ -84,6 +86,8 @@ export interface PlaybackTarget {
   episode: number;
   filePath: string;
   title: string;
+  /** AniList cover shown on Discord. */
+  coverUrl: string;
 }
 
 export interface SharedFile {
@@ -155,7 +159,7 @@ interface BridgeApi {
   'stream.share': [void, SharedFile];
   'stream.stopSharing': [void, boolean];
   /** Friend side: opens the local address fed by the UI and plays it. */
-  'stream.play': [{ mediaId: number; episode: number; title: string; fileSize: number; extension: string }, boolean];
+  'stream.play': [{ mediaId: number; episode: number; title: string; coverUrl: string; fileSize: number; extension: string }, boolean];
   'stream.closeViewer': [void, boolean];
   'shell.openUrl': [{ url: string }, boolean];
   'shell.openPath': [{ path: string }, boolean];
@@ -170,6 +174,8 @@ interface BridgeApi {
   'window.startResize': [void, boolean];
   /** Answers "window.closing": the app may now quit. */
   'window.readyToQuit': [void, boolean];
+  /** The anime of a ruruka:// link waiting for the UI, once; null otherwise. */
+  'window.takeMediaLink': [void, number | null];
   'update.check': [void, UpdateInfo | null];
   'update.install': [void, boolean];
   /** Read-only call to the manga site API (`/manga…`, `/at-home/server/…`), proxied because that API has no CORS. */
@@ -192,6 +198,8 @@ export interface BridgeEvents {
   'player.closed': { mediaId: number; episode: number; watchedRatio: number };
   /** The app is really quitting (not hiding to the tray); answer with "window.readyToQuit" within 5 s. */
   'window.closing': Record<string, never>;
+  /** A ruruka:// link reached the running app: collect it with "window.takeMediaLink". */
+  'window.mediaLinkOpened': Record<string, never>;
 }
 
 type Method = keyof BridgeApi;

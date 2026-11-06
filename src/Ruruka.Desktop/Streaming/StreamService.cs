@@ -72,12 +72,12 @@ public sealed partial class StreamService(PlayerService player, IBridgeEvents ev
     }
 
     /// <summary>Friend side: plays the host's file; the local address replaces the previous one.</summary>
-    public async Task PlayAsync(int mediaId, int episode, string title, long fileSize, string extension)
+    public async Task PlayAsync(int mediaId, int episode, string title, string? coverUrl, long fileSize, string extension)
     {
         var url = OpenViewer(fileSize, extension);
         try
         {
-            await player.PlayStreamAsync(new PlaybackTarget(mediaId, episode, url, title));
+            await player.PlayStreamAsync(new PlaybackTarget(mediaId, episode, url, title, coverUrl));
         }
         catch (BridgeException)
         {

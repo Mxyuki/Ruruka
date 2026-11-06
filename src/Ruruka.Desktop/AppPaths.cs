@@ -17,6 +17,9 @@ internal static class AppPaths
 
     public static string CalendarFile => Path.Combine(RoamingData, "calendar.json");
 
+    /// <summary>The media id a second Ruruka, started by a link, leaves for the running one.</summary>
+    public static string PendingMediaLinkFile => Path.Combine(LocalData, "pending-media-link.txt");
+
     public static string WebViewData => Path.Combine(LocalData, "WebView2");
 
     public static string WebRoot => Path.Combine(AppContext.BaseDirectory, "wwwroot");

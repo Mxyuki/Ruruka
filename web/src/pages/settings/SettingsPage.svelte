@@ -104,6 +104,15 @@
           onchange={(isPlayerKeptOpen) => update({ isPlayerKeptOpen })}
         />
       </div>
+      {#if session.settings?.playerKind === 'ruruka'}
+        <div class="option">
+          <Toggle
+            checked={session.settings.isDiscordPresenceShown}
+            label="Montrer sur Discord l’anime, l’épisode et le temps quand je regarde avec le lecteur Ruruka"
+            onchange={(isDiscordPresenceShown) => update({ isDiscordPresenceShown })}
+          />
+        </div>
+      {/if}
 
       <!-- Quand un épisode compte comme vu -->
       <h3 class="option-title">Épisode vu à</h3>
