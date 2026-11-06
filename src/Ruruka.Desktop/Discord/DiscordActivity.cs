@@ -30,7 +30,6 @@ internal sealed record DiscordActivity(int MediaId, string Details, string State
 
     // Discord accepts a join secret on a Watching activity but only offers invitations for Playing.
     private const int PlayingType = 0;
-    private const int ShowDetailsInStatus = 2;
     private const int MaxTextLength = 128;
     private const int MaxImageUrlLength = 256;
     private const string ButtonLabel = "Ouvrir dans Ruruka";
@@ -95,13 +94,14 @@ internal sealed record DiscordActivity(int MediaId, string Details, string State
     /// <summary>
     /// The activity object of SET_ACTIVITY: the cover as large image with the Ruruka icon as its badge.
     /// Discord refuses buttons next to a join secret, so a waiting session trades the button for invites.
+    /// An episode replaces the app's name with the anime's, so statuses read "Watching {anime}" everywhere.
     /// </summary>
     public object ToPayload() => new
     {
         type = Invite is null ? WatchingType : PlayingType,
-        status_display_type = ShowDetailsInStatus,
-        details = Details,
-        state = State,
+        name = Invite is null ? Details : null,
+        details = Invite is null ? State : Details,
+        state = Invite is null ? null : State,
         timestamps = StartsAtMs is { } start && EndsAtMs is { } end ? new { start, end } : null,
         assets = new
         {

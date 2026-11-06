@@ -9,7 +9,15 @@
 
   let { update }: Props = $props();
 
-  const volumeOptions = [10, 20, 30, 40, 50, 75, 100];
+  // <-- Le réglage n'est écrit qu'au relâchement : glisser le curseur ne doit pas réécrire settings.json à chaque pas -->
+  let draggedVolume = $state<number | null>(null);
+  const volume = $derived(draggedVolume ?? session.settings?.profileVideoVolumePercent ?? 30);
+
+  async function saveVolume() {
+    if (draggedVolume === null) return;
+    await update({ profileVideoVolumePercent: draggedVolume });
+    draggedVolume = null;
+  }
 </script>
 
 <section class="card" style:--accent="var(--colorStrawberry)">
@@ -32,12 +40,9 @@
 
   <h3 class="option-title">Volume de départ</h3>
   <p class="hint">Le volume d’une vidéo quand elle prend le son, pour éviter les mauvaises surprises.</p>
-  <div class="volumes">
-    {#each volumeOptions as percent (percent)}
-      <button class="chip" class:is-active={session.settings?.profileVideoVolumePercent === percent} type="button" onclick={() => update({ profileVideoVolumePercent: percent })}>
-        {percent} %
-      </button>
-    {/each}
+  <div class="volume" style:--fill="{volume}%">
+    <input type="range" min="0" max="100" step="1" aria-label="Volume de départ" value={volume} oninput={(event) => (draggedVolume = Number(event.currentTarget.value))} onchange={saveVolume} />
+    <span class="readout">{volume} %</span>
   </div>
 </section>
 
@@ -64,19 +69,35 @@
     font-weight: 800;
   }
 
-  .volumes {
+  .volume {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space2);
+    align-items: center;
+    gap: var(--space3);
   }
 
-  .volumes .chip {
-    border: 0;
-    background: var(--colorSunken);
+  .readout {
+    min-width: 3.5em;
+    font-size: var(--fontSizeSm);
+  }
+
+  input[type='range'] {
+    flex: 1;
+    max-width: 320px;
+    height: 12px;
+    border: var(--outlineThin);
+    border-radius: var(--radiusPill);
+    background: linear-gradient(90deg, var(--colorStar) var(--fill), var(--colorPaper) var(--fill));
     cursor: pointer;
+    appearance: none;
   }
 
-  .volumes .chip.is-active {
-    background: var(--colorBlond);
+  input[type='range']::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    border: var(--outline);
+    border-radius: 50%;
+    background: var(--colorStrawberry);
+    box-shadow: 2px 2px 0 var(--colorInk);
+    appearance: none;
   }
 </style>
