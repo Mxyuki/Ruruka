@@ -59,6 +59,10 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
         {
             throw new BridgeException($"La mémoire des comparaisons va de 0 à {MaxCompareCacheMinutes} minutes.");
         }
+        if (patch.ProfileVideoVolumePercent is < 0 or > 100)
+        {
+            throw new BridgeException("Le volume des vidéos va de 0 à 100 %.");
+        }
         if (patch.CalendarCovers is not (null or "all" or "single" or "none"))
         {
             throw new BridgeException("Choix d'images du calendrier inconnu.");

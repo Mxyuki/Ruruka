@@ -139,6 +139,18 @@ public class DiscordActivityTests
     }
 
     [Fact]
+    public void FollowedEpisodeIsWatchedWithItsTimeBar()
+    {
+        var followed = new SessionEpisode(123, 5, "Precure", Cover, 60, 1440).ToNowWatching();
+
+        var activity = DiscordActivity.ForNow(followed, null, "Avec Alice", Now)!;
+
+        Assert.Equal("Épisode 5", activity.State);
+        Assert.Equal(Now.AddSeconds(1380).ToUnixTimeMilliseconds(), activity.EndsAtMs);
+        Assert.Equal(3, Payload(activity).GetProperty("type").GetInt32());
+    }
+
+    [Fact]
     public void NothingToShowClearsTheActivity()
     {
         Assert.Null(DiscordActivity.ForNow(null, null, null, Now));

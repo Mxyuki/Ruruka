@@ -43,6 +43,8 @@ son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** qua
 - **Ton épisode sur Discord.** Avec le lecteur Ruruka, ton profil montre l'anime, l'épisode et le temps
   regardé, avec l'image de l'anime. Le bouton ouvre l'anime dans Ruruka pour tes amis qui l'ont, sur AniList
   pour les autres. Tu peux le couper dans les réglages.
+- **Vidéos des profils.** Elles ont un petit lecteur avec pause et volume. Dans les réglages, tu choisis si
+  elles se lancent seules, avec ou sans le son, et à quel volume.
 - **Invitations Discord.** Pendant une séance, invite un ami depuis le **+** du chat : il clique sur la carte
   et son Ruruka rejoint tout seul. Pendant l'épisode, le survol du badge Ruruka montre qui regarde avec toi.
 - **Une seule fenêtre pour toute la soirée.** À la fin d'un épisode, le lecteur reste ouvert ; lance

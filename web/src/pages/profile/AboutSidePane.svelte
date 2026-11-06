@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fillAboutTemplate, hasLiveTags } from '../../lib/aboutTemplate';
   import { renderAniListMarkdown } from '../../lib/markdown';
+  import { profileVideos } from './profileVideos';
   import { liveAbout } from '../../state/liveAbout.svelte';
   import AboutGuide from './AboutGuide.svelte';
   import type { AboutSyntax } from './aboutSyntax';
@@ -44,7 +45,9 @@
     {#if activePane === 'guide'}
       <AboutGuide {oninsert} />
     {:else if previewHtml}
-      <div class="rich-text preview">{@html previewHtml}</div>
+      {#key previewHtml}
+        <div class="rich-text preview" use:profileVideos>{@html previewHtml}</div>
+      {/key}
     {:else}
       <p class="placeholder">L’aperçu de ton dossier apparaîtra ici.</p>
     {/if}

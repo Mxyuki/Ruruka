@@ -34,6 +34,15 @@ public sealed record AppSettings
     /// <summary>Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations.</summary>
     public bool IsDiscordPresenceShown { get; init; } = true;
 
+    /// <summary>Videos in profiles start by themselves once on screen.</summary>
+    public bool IsProfileVideoAutoplayed { get; init; } = true;
+
+    /// <summary>The first video of a profile starts with sound.</summary>
+    public bool IsProfileVideoSoundOn { get; init; }
+
+    /// <summary>Volume (in %) of a profile video when it gets the sound.</summary>
+    public int ProfileVideoVolumePercent { get; init; } = 30;
+
     /// <summary>How far into an episode (in %) playback must reach before it counts as watched.</summary>
     public int EpisodeCompletionPercent { get; init; } = 85;
 
@@ -86,6 +95,9 @@ public sealed record AppSettings
         IsLaunchedAtStartup,
         IsPlayerKeptOpen,
         IsDiscordPresenceShown,
+        IsProfileVideoAutoplayed,
+        IsProfileVideoSoundOn,
+        ProfileVideoVolumePercent,
         EpisodeCompletionPercent,
         MinimumWatchedPercent,
         CompareCacheMinutes,
@@ -115,6 +127,9 @@ public sealed record PublicSettings(
     bool IsLaunchedAtStartup,
     bool IsPlayerKeptOpen,
     bool IsDiscordPresenceShown,
+    bool IsProfileVideoAutoplayed,
+    bool IsProfileVideoSoundOn,
+    int ProfileVideoVolumePercent,
     int EpisodeCompletionPercent,
     int MinimumWatchedPercent,
     int CompareCacheMinutes,
@@ -143,6 +158,9 @@ public sealed record SettingsPatch
     public bool? IsLaunchedAtStartup { get; init; }
     public bool? IsPlayerKeptOpen { get; init; }
     public bool? IsDiscordPresenceShown { get; init; }
+    public bool? IsProfileVideoAutoplayed { get; init; }
+    public bool? IsProfileVideoSoundOn { get; init; }
+    public int? ProfileVideoVolumePercent { get; init; }
     public int? EpisodeCompletionPercent { get; init; }
     public int? MinimumWatchedPercent { get; init; }
     public int? CompareCacheMinutes { get; init; }

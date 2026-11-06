@@ -9,6 +9,7 @@
   import Section from '../../components/Section.svelte';
   import FavouriteGrid from './FavouriteGrid.svelte';
   import { renderAniListMarkdown } from '../../lib/markdown';
+  import { profileVideos } from './profileVideos';
   import type { RouteParams } from '../../lib/router.svelte';
   import { aboutEditorPath, characterPath, staffPath, studioPath, userListPath, userSectionPath } from '../../lib/routes';
   import { session } from '../../state/session.svelte';
@@ -82,7 +83,9 @@
           </a>
         {/if}
         {#if user.about}
-          <div class="rich-text" bind:clientHeight={aboutHeight}>{@html renderAniListMarkdown(user.about)}</div>
+          {#key user.about}
+            <div class="rich-text" bind:clientHeight={aboutHeight} use:profileVideos>{@html renderAniListMarkdown(user.about)}</div>
+          {/key}
         {:else}
           <p class="empty">Ton dossier est encore vierge. Écris quelques lignes pour te présenter aux autres détectives !</p>
         {/if}

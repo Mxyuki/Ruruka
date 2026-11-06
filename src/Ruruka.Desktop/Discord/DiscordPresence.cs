@@ -29,6 +29,7 @@ internal sealed class DiscordPresence : IPlaybackListener
     private NowWatching? _watching;
     private SessionInvite? _invite;
     private string? _companions;
+    private SessionEpisode? _sessionEpisode;
     private string? _joinCode;
     private volatile bool _isConnectDue;
     private DiscordIpcClient? _client;
@@ -61,12 +62,13 @@ internal sealed class DiscordPresence : IPlaybackListener
         Refresh();
     }
 
-    /// <summary>The session this PC is in: the invitation when it hosts, and the others to name on hover.</summary>
-    public void SetSession(SessionInvite? invite, IReadOnlyList<string> companionNames)
+    /// <summary>The session this PC is in: the invitation when it hosts, the others to name on hover, and the episode a friend follows.</summary>
+    public void SetSession(SessionInvite? invite, IReadOnlyList<string> companionNames, SessionEpisode? sessionEpisode)
     {
         lock (_gate)
         {
             _invite = invite;
+            _sessionEpisode = sessionEpisode;
             _companions = DiscordActivity.DescribeCompanions(companionNames);
         }
         Refresh();
@@ -118,7 +120,7 @@ internal sealed class DiscordPresence : IPlaybackListener
 
     private DiscordActivity? CurrentActivity()
     {
-        lock (_gate) return DiscordActivity.ForNow(_watching, _invite, _companions, DateTimeOffset.UtcNow);
+        lock (_gate) return DiscordActivity.ForNow(_watching ?? _sessionEpisode?.ToNowWatching(), _invite, _companions, DateTimeOffset.UtcNow);
     }
 
     private async Task<bool> TryConnectAsync()

@@ -16,7 +16,7 @@ internal sealed partial class DiscordModule(DiscordPresence presence) : IBridgeM
             {
                 throw new BridgeException("Liste de détectives invalide.");
             }
-            presence.SetSession(ToInvite(parameters), parameters.CompanionNames);
+            presence.SetSession(ToInvite(parameters), parameters.CompanionNames, parameters.Watching);
             return Task.FromResult(true);
         });
         router.Register("discord.takeJoinCode", () => Task.FromResult(presence.TakeJoinCode()));
@@ -42,7 +42,7 @@ internal sealed partial class DiscordModule(DiscordPresence presence) : IBridgeM
     [GeneratedRegex(@"^\d{1,20}$")]
     private static partial Regex UserId();
 
-    private sealed record SessionParams(string? Code, int MemberCount, IReadOnlyList<string> CompanionNames);
+    private sealed record SessionParams(string? Code, int MemberCount, IReadOnlyList<string> CompanionNames, SessionEpisode? Watching);
 
     private sealed record AcceptParams(string UserId);
 }

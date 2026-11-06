@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { fetchFollowing, fetchMedia, type FollowingEntry } from '../../api/queries/media';
+  import { fetchFollowing, fetchInheritedBanner, fetchMedia, type FollowingEntry, type MediaDetails } from '../../api/queries/media';
   import EmptyState from '../../components/EmptyState.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
@@ -23,11 +23,18 @@
   let { params }: { params: RouteParams } = $props();
 
   const id = $derived(Number(params.id));
-  const details = $derived(fetchMedia(id));
+  const details = $derived(fetchMedia(id).then(withInheritedBanner));
   // <-- Les notes des amis sont un bonus : la page s'affiche même si elles échouent -->
   const following = $derived(fetchFollowing(id).catch((): FollowingEntry[] => []));
   const sectionOrder = $derived(orderSections(session.settings?.mediaSectionOrder ?? []));
   let isChaptersOpen = $state(false);
+
+  // <-- Une saison 2 sans bannière reprend celle d'une saison précédente ; c'est un bonus, l'échec ne bloque pas la page -->
+  async function withInheritedBanner(media: MediaDetails): Promise<MediaDetails> {
+    if (media.bannerImage) return media;
+    const bannerImage = await fetchInheritedBanner(media).catch(() => null);
+    return { ...media, bannerImage };
+  }
 
   // <-- Le bouton « Chapitres » du dossier ouvre la liste des chapitres et y descend -->
   async function openChapters() {

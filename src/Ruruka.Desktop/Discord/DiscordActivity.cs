@@ -9,6 +9,12 @@ internal sealed record SessionInvite(string Code, int MemberCount);
 /// <summary>Payload of "discord.joinAsked": someone asked to join the hosted session from Discord.</summary>
 internal sealed record JoinAsked(string UserId, string Name);
 
+/// <summary>The session's episode as a friend follows it, for instance on the host's Discord screen share.</summary>
+internal sealed record SessionEpisode(int MediaId, int Episode, string Title, string? CoverUrl, double PositionSeconds, double DurationSeconds)
+{
+    public NowWatching ToNowWatching() => new(MediaId, Episode, Title, CoverUrl, PositionSeconds, DurationSeconds, false);
+}
+
 /// <summary>What the Ruruka player shows right now.</summary>
 internal sealed record NowWatching(int MediaId, int Episode, string Title, string? CoverUrl, double PositionSeconds, double DurationSeconds, bool IsPaused);
 

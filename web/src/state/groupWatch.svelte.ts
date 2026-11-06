@@ -1,7 +1,7 @@
 import { fetchMediaSummaries } from '../api/queries/media';
 import type { MediaSummary } from '../api/types';
 import { joinRelayRoom, type RelayMessage, type RelayRoom } from '../api/watchRelay';
-import { invoke, on, type BridgeEvents } from '../lib/bridge';
+import { invoke, on, type BridgeEvents, type SessionEpisode } from '../lib/bridge';
 import { createWatchCode, normalizeWatchCode } from '../lib/watchCode';
 import { liveAbout } from './liveAbout.svelte';
 import { mediaList } from './mediaList.svelte';
@@ -384,9 +384,18 @@ class GroupWatch {
     return [this.remote.hostName, ...others.map((member) => member.name)];
   }
 
+  // <-- Un ami devant le partage d'écran de l'hôte n'a aucun lecteur ici : l'activité vient de l'état de la séance -->
+  private followedEpisode(): SessionEpisode | null {
+    const shared = this.remote?.shared;
+    if (!shared) return null;
+    const { mediaId, episode, positionSeconds, durationSeconds, media } = shared;
+    return { mediaId, episode, title: media.title.userPreferred, coverUrl: media.coverImage.large, positionSeconds, durationSeconds };
+  }
+
   private updateDiscordSession(): void {
     const code = this.role === 'hosting' ? this.code : null;
-    invoke('discord.setSession', { code, memberCount: this.friends.length + 1, companionNames: this.companionNames() }).catch((error: unknown) =>
+    const details = { code, memberCount: this.friends.length + 1, companionNames: this.companionNames(), watching: this.followedEpisode() };
+    invoke('discord.setSession', details).catch((error: unknown) =>
       toasts.error(error, 'Impossible de mettre à jour la séance sur Discord'),
     );
   }

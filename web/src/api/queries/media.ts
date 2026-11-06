@@ -164,6 +164,42 @@ export function fetchMedia(id: number): Promise<MediaDetails> {
   });
 }
 
+const prequelQuery = `
+  query ($id: Int) {
+    Media(id: $id) {
+      relations {
+        edges { relationType(version: 2) node { id type bannerImage } }
+      }
+    }
+  }
+`;
+
+type PrequelNode = Pick<MediaSummary, 'id' | 'type' | 'bannerImage'>;
+
+// <-- Une très longue série ne doit pas coûter une rafale de requêtes à l'ouverture de la page -->
+const maxPrequelLookups = 15;
+
+function prequelIn(edges: { relationType: string; node: PrequelNode }[], type: MediaType): PrequelNode | null {
+  return edges.find((edge) => edge.relationType === 'PREQUEL' && edge.node.type === type)?.node ?? null;
+}
+
+/** The banner of the closest earlier season that has one; null when none does. */
+export function fetchInheritedBanner(media: MediaDetails): Promise<string | null> {
+  return cached(`inheritedBanner:${media.id}`, 60 * minuteMs, async () => {
+    const seenIds = new Set([media.id]);
+    let prequel = prequelIn(media.relations, media.type);
+    for (let lookup = 0; lookup <= maxPrequelLookups; lookup++) {
+      if (!prequel || seenIds.has(prequel.id)) return null;
+      if (prequel.bannerImage) return prequel.bannerImage;
+      seenIds.add(prequel.id);
+      if (lookup === maxPrequelLookups) return null;
+      const { Media } = await gql<{ Media: { relations: { edges: { relationType: string; node: PrequelNode }[] } } }>(prequelQuery, { id: prequel.id });
+      prequel = prequelIn(Media.relations.edges, media.type);
+    }
+    return null;
+  });
+}
+
 export interface FollowingEntry {
   name: string;
   avatar: string;

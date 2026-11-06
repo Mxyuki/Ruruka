@@ -43,7 +43,7 @@ export const aboutSyntaxGroups: AboutSyntaxGroup[] = [
       { name: 'Image à largeur fixe', description: 'Le nombre fixe la largeur en pixels. « img50% » prend la moitié de la largeur.', before: 'img220(', placeholder: 'https://i.imgur.com/image.png', after: ')' },
       { name: 'Image cliquable', description: 'Une image qui ouvre un lien : l’image se met à la place du texte du lien.', before: '[img200(https://i.imgur.com/image.png)](', placeholder: 'https://anilist.co', after: ')' },
       { name: 'YouTube', description: 'Intègre le lecteur YouTube. Le lien complet ou juste l’identifiant de la vidéo.', before: 'youtube(', placeholder: 'https://www.youtube.com/watch?v=', after: ')', isQuick: true },
-      { name: 'Vidéo webm', description: 'Lue en boucle et sans son, comme un GIF.', before: 'webm(', placeholder: 'https://files.catbox.moe/video.webm', after: ')' },
+      { name: 'Vidéo webm', description: 'Lue en boucle, avec pause et volume. Chacun choisit le son et le lancement dans ses réglages.', before: 'webm(', placeholder: 'https://files.catbox.moe/video.webm', after: ')' },
     ],
   },
   {

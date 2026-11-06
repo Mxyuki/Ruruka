@@ -11,6 +11,7 @@
   import { toasts } from '../../state/toasts.svelte';
   import SectionOrderDialog from './SectionOrderDialog.svelte';
   import SitesCard from './SitesCard.svelte';
+  import ProfileVideoCard from './ProfileVideoCard.svelte';
   import ThemeCard from './ThemeCard.svelte';
   import UpdateCard from './UpdateCard.svelte';
 
@@ -177,6 +178,8 @@
         {/each}
       </div>
     </section>
+
+    <ProfileVideoCard {update} />
 
     <SitesCard {update} />
 

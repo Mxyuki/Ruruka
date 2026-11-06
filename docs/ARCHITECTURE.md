@@ -130,7 +130,7 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `window.takeMediaLink` | The anime of a waiting `ruruka://media/{id}` link, once; null otherwise. The UI asks at startup and on `window.mediaLinkOpened` |
-| `discord.setSession` | The session as Discord shows it: the host's code for invitations (null otherwise) and the names of the others |
+| `discord.setSession` | The session as Discord shows it: the host's code for invitations (null otherwise), the names of the others, and the episode a friend follows |
 | `discord.takeJoinCode` | The code of an invitation accepted on this PC, once; null otherwise. The UI asks once logged in and on `discord.joinRequested` |
 | `discord.acceptJoin` | Host: let in someone who asked to join from Discord |
 | `shell.openUrl` | Open an http(s) link in the default browser |
@@ -201,6 +201,8 @@ publishes the result with `UpdateUser(about)`, at most every 15 s (4 requests pe
 AniList's 30–90 per minute), and only when the text changed. While idle, the tags describe the anime
 most recently advanced in the list. Quitting the app publishes the idle version first. Editing the about on anilist.co is overwritten by the next update.
 
+**Inherited banner.** A media page without a banner uses the closest earlier season that has one (`fetchInheritedBanner`). It follows `PREQUEL` relations of the same type: the page's own relations give the first step for free, each further step is one request, capped at 15, and the result is cached for an hour. With no banner on the way, the page keeps its usual empty band.
+
 **Anime songs.** The media page's « La bande-son » menu calls AnisongDB (`api/anisongdb.ts`, plain
 `fetch`, CORS allowed) only when it is first opened. It looks songs up by MyAnimeList id
 (`mal_ids_request`, exact), then by romaji and English title (`search_request`), and keeps only songs
@@ -268,7 +270,11 @@ connection is retried 5 times with the same code. The topic is an HKDF hash of t
 message is AES-GCM sealed with a key derived from it, so the public broker (where anyone can list topics)
 can neither read nor forge session messages.
 
+**Friends without a player.** A friend watching the host's screen share has no mpv here, so nothing reports playback. `groupWatch` sends the episode from the host's state in `discord.setSession`, and `DiscordPresence` uses it when no local player reports one. It follows the host's updates (every 15 s), and a host's pause doesn't reach it.
+
 **Who is in the session.** The host alone hears friends arrive and leave, so its state carries `members`, and each Ruruka gives Discord the others' AniList names. They appear on hover: on the Ruruka badge, or on the large image when there is no cover. `DiscordActivity.DescribeCompanions` fits them in Discord's 128 characters.
+
+**Profile videos.** The `sanitizeHtml` output keeps AniList's silent looping `<video>`, as a GIF, wherever rich text appears. Only the profile about and its editor preview swap each one for `ProfileVideo.svelte` (`use:profileVideos`). It plays while on screen, so a video in a closed spoiler stays silent, and pauses off screen. Only one video has sound at a time. The volume, autoplay and sound settings are in `AppSettings`. WebView2 can refuse sound before the first interaction with the page, and the video then starts muted.
 
 **Group watch modes.** The host picks how friends watch (`HostState.mode`): `screen` (shared elsewhere, as above), `files` or `stream`.
 In the last two, `player.sync` goes out on the non-retained `sync` channel, and a friend who follows the host passes each point to

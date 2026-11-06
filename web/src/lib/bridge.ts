@@ -23,6 +23,12 @@ export interface Settings {
   isPlayerKeptOpen: boolean;
   /** Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations. */
   isDiscordPresenceShown: boolean;
+  /** Videos in profiles start by themselves once on screen. */
+  isProfileVideoAutoplayed: boolean;
+  /** The first video of a profile starts with sound. */
+  isProfileVideoSoundOn: boolean;
+  /** Volume (in %) of a profile video when it gets the sound. */
+  profileVideoVolumePercent: number;
   /** How far into an episode (in %) playback must reach before it counts as watched. */
   episodeCompletionPercent: number;
   /** The share of an episode (in %) that must really be played; the rest may be skipped. */
@@ -88,6 +94,16 @@ export interface PlaybackTarget {
   title: string;
   /** AniList cover shown on Discord. */
   coverUrl: string;
+}
+
+/** The session's episode as a friend follows it, with or without a player on this PC. */
+export interface SessionEpisode {
+  mediaId: number;
+  episode: number;
+  title: string;
+  coverUrl: string;
+  positionSeconds: number;
+  durationSeconds: number;
 }
 
 export interface SharedFile {
@@ -161,8 +177,8 @@ interface BridgeApi {
   /** Friend side: opens the local address fed by the UI and plays it. */
   'stream.play': [{ mediaId: number; episode: number; title: string; coverUrl: string; fileSize: number; extension: string }, boolean];
   'stream.closeViewer': [void, boolean];
-  /** The session as Discord should show it: `code` offers invitations when hosting, `companionNames` are the others in it. */
-  'discord.setSession': [{ code: string | null; memberCount: number; companionNames: string[] }, boolean];
+  /** The session as Discord should show it: `code` offers invitations when hosting, `companionNames` are the others in it, `watching` is the episode a friend follows. */
+  'discord.setSession': [{ code: string | null; memberCount: number; companionNames: string[]; watching: SessionEpisode | null }, boolean];
   /** The code of an invitation accepted on this PC, once; null otherwise. */
   'discord.takeJoinCode': [void, string | null];
   /** Host side: lets in someone who asked to join from Discord. */
