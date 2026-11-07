@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ListEntry } from '../../api/types';
   import Icon from '../../components/Icon.svelte';
-  import { formatCountdown } from '../../lib/format';
+  import { airedEpisodeCount, formatCountdown } from '../../lib/format';
   import { episodeSearchUrl } from '../../lib/searchSite';
   import { siteName } from '../../lib/siteAddress';
   import { mediaPath } from '../../lib/routes';
@@ -21,6 +21,7 @@
   const nextEpisode = $derived(entry.progress + 1);
   const total = $derived(media.episodes);
   const airing = $derived(media.nextAiringEpisode);
+  const airedCount = $derived(airedEpisodeCount(media));
   const isCaughtUp = $derived(total !== null && entry.progress >= total);
   const isWaitingForAiring = $derived(Boolean(airing && nextEpisode >= airing.episode));
 
@@ -45,7 +46,7 @@
   </svg>
   <a href="#{mediaPath(media.id)}"><img src={media.coverImage.medium} alt="" loading="lazy" /></a>
   <a class="title" href="#{mediaPath(media.id)}">{media.title.userPreferred}</a>
-  <span class="episode">ÉP. {String(entry.progress).padStart(2, '0')}{total ? `/${total}` : ''}</span>
+  <span class="episode">ÉP. {String(entry.progress).padStart(2, '0')}{total ? `/${total}` : ''}{airedCount === null ? '' : ` [${airedCount}]`}</span>
 
   <div class="action">
     {#if isCaughtUp}
@@ -77,7 +78,7 @@
 <style>
   .row {
     display: grid;
-    grid-template-columns: 22px 38px minmax(0, 1fr) 82px 128px 34px;
+    grid-template-columns: 22px 38px minmax(0, 1fr) 124px 128px 34px;
     align-items: center;
     gap: var(--space3);
     padding: 7px var(--space3);
@@ -134,6 +135,7 @@
     color: var(--textSoft);
     font-family: var(--fontFile);
     font-size: var(--fontSizeXs);
+    white-space: nowrap;
   }
 
   .action {

@@ -11,10 +11,11 @@
 
   interface Props {
     activityId: number;
+    focusedReplyId?: number | null;
     onreplied: () => void;
   }
 
-  let { activityId, onreplied }: Props = $props();
+  let { activityId, focusedReplyId = null, onreplied }: Props = $props();
 
   let replies = $state<ActivityReply[]>([]);
   let isLoading = $state(true);
@@ -28,6 +29,10 @@
       isLoading = false;
     }
   });
+
+  function revealWhenFocused(row: HTMLElement, isFocused: boolean) {
+    if (isFocused) row.scrollIntoView({ block: 'center' });
+  }
 
   async function reply(text: string) {
     try {
@@ -45,7 +50,7 @@
     <p class="faint">On recueille les témoignages…</p>
   {:else}
     {#each replies as reply, index (reply.id)}
-      <div class="reply">
+      <div class="reply" class:is-focused={reply.id === focusedReplyId} use:revealWhenFocused={reply.id === focusedReplyId}>
         <a href="#{userPath(reply.user.name)}"><img src={reply.user.avatar.medium} alt="" loading="lazy" /></a>
         <div class="body">
           <div class="meta">
@@ -77,6 +82,13 @@
     gap: var(--space2);
     align-items: start;
     animation: appear 0.25s ease-out;
+  }
+
+  .is-focused {
+    margin: calc(-1 * var(--space1));
+    padding: var(--space1);
+    border-radius: var(--radiusSmall);
+    background: var(--colorSkySoft);
   }
 
   img {

@@ -28,6 +28,7 @@ export type Activity = Social & { replyCount: number } & (
       score: number | null;
     }
   | { kind: 'text'; id: number; createdAt: number; user: ActivityUser; text: string }
+  | { kind: 'message'; id: number; createdAt: number; user: ActivityUser; text: string }
 );
 
 export interface ActivityReply extends Social {
@@ -47,6 +48,14 @@ const likeFields = `likeCount isLiked likes { id name avatar { medium } }`;
 const socialFields = `${likeFields} replyCount`;
 const replyFields = `id createdAt text(asHtml: true) ${likeFields} ${userSelection}`;
 
+const listActivityFields = `
+  ... on ListActivity {
+    id createdAt status progress ${socialFields} ${userSelection}
+    media { id type title { romaji english native userPreferred } coverImage { medium large } }
+  }
+`;
+const textActivityFields = `... on TextActivity { id createdAt text(asHtml: true) ${socialFields} ${userSelection} }`;
+
 /** `filter` is spliced into `activities(…)`, e.g. "isFollowing: true" or "userId: $userId". */
 const activityQuery = (variables: string, filter: string) => `
   query ($page: Int${variables}) {
@@ -54,11 +63,8 @@ const activityQuery = (variables: string, filter: string) => `
       pageInfo { hasNextPage currentPage }
       activities(${filter}, type_in: [ANIME_LIST, MANGA_LIST, TEXT], sort: ID_DESC) {
         __typename
-        ... on ListActivity {
-          id createdAt status progress ${socialFields} ${userSelection}
-          media { id type title { romaji english native userPreferred } coverImage { medium large } }
-        }
-        ... on TextActivity { id createdAt text(asHtml: true) ${socialFields} ${userSelection} }
+        ${listActivityFields}
+        ${textActivityFields}
       }
     }
   }
@@ -70,7 +76,7 @@ const userActivityQuery = activityQuery(', $userId: Int', 'userId: $userId');
 type ListFields = Omit<Extract<Activity, { kind: 'list' }>, 'kind' | 'score'>;
 type TextFields = Omit<Extract<Activity, { kind: 'text' }>, 'kind'>;
 type RawListActivity = { __typename: 'ListActivity' } & ListFields;
-type RawActivity = RawListActivity | ({ __typename: 'TextActivity' } & TextFields);
+type RawActivity = RawListActivity | ({ __typename: 'TextActivity' | 'MessageActivity' } & TextFields);
 
 const scoreKey = (userId: number, mediaId: number) => `${userId}:${mediaId}`;
 
@@ -85,7 +91,7 @@ function normalize(raw: RawActivity, scores: Map<string, number>): Activity {
     return { kind: 'list', ...activity, score: score || null };
   }
   const { __typename, ...activity } = raw;
-  return { kind: 'text', ...activity };
+  return { kind: __typename === 'TextActivity' ? 'text' : 'message', ...activity };
 }
 
 const maxScorePages = 3;
@@ -142,6 +148,26 @@ export function fetchFriendActivity(viewerId: number, scoreFormat: ScoreFormat, 
 
 export function fetchUserActivity(userId: number, scoreFormat: ScoreFormat, page = 1): Promise<ActivityPage> {
   return fetchActivities(userActivityQuery, { page, userId }, scoreFormat, () => true);
+}
+
+// <-- Sur un message, l'auteur s'appelle `messenger` et le texte `message` : les alias rejoignent la forme d'un statut -->
+const singleActivityQuery = `
+  query ($id: Int) {
+    Activity(id: $id) {
+      __typename
+      ${listActivityFields}
+      ${textActivityFields}
+      ... on MessageActivity {
+        id createdAt text: message(asHtml: true) ${socialFields}
+        user: messenger { id name avatar { medium } }
+      }
+    }
+  }
+`;
+
+export async function fetchActivity(id: number, scoreFormat: ScoreFormat): Promise<Activity> {
+  const { Activity } = await gql<{ Activity: RawActivity }>(singleActivityQuery, { id });
+  return normalize(Activity, await fetchCompletedScores([Activity], scoreFormat));
 }
 
 const repliesQuery = `
@@ -211,6 +237,7 @@ const toggleLikeMutation = `
     ToggleLikeV2(id: $id, type: $type) {
       ... on ListActivity { likeCount isLiked }
       ... on TextActivity { likeCount isLiked }
+      ... on MessageActivity { likeCount isLiked }
       ... on ActivityReply { likeCount isLiked }
     }
   }

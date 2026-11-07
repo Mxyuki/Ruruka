@@ -7,11 +7,11 @@
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
-  import { formatListStatus, statusColor } from '../../lib/format';
+  import { formatListStatus, formatProgress, statusColor } from '../../lib/format';
   import type { RouteParams } from '../../lib/router.svelte';
   import { userPath } from '../../lib/routes';
   import { normalizeForMatch } from '../../lib/titleMatch';
-  import { mediaList } from '../../state/mediaList.svelte';
+  import { mediaList, totalUnits } from '../../state/mediaList.svelte';
   import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
   import ListRow from './ListRow.svelte';
@@ -161,7 +161,7 @@
         <div class="media-grid">
           {#each group.entries as entry (entry.id)}
             <MediaCard media={entry.media}>
-              {#snippet overlay()}{entry.progress}{entry.media.episodes ?? entry.media.chapters ? ` / ${entry.media.episodes ?? entry.media.chapters}` : ''}{/snippet}
+              {#snippet overlay()}{formatProgress(entry.progress, totalUnits(entry.media), entry.media)}{/snippet}
             </MediaCard>
           {/each}
         </div>

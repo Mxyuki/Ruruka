@@ -9,7 +9,7 @@
   import ScoreInput from '../../components/ScoreInput.svelte';
   import Sticker from '../../components/Sticker.svelte';
   import ShareDialog from './ShareDialog.svelte';
-  import { formatListStatus, unitLabel, statusColor } from '../../lib/format';
+  import { airedEpisodeCount, formatListStatus, unitLabel, statusColor } from '../../lib/format';
   import { mediaSearchUrl } from '../../lib/searchSite';
   import { siteName } from '../../lib/siteAddress';
   import { mediaList, totalUnits } from '../../state/mediaList.svelte';
@@ -119,7 +119,7 @@
     {#if entry}
       <div class="field">
         <span class="field-label">{unitLabel(media.type)}s vus</span>
-        <NumberStepper label="progression" value={entry.progress} max={totalUnits(media)} onchange={setProgress} />
+        <NumberStepper label="progression" value={entry.progress} max={totalUnits(media)} released={airedEpisodeCount(media)} onchange={setProgress} />
       </div>
       {#if media.type === 'MANGA'}
         <div class="field">

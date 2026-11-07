@@ -149,6 +149,14 @@ function cleanAttributes(element: Element): void {
   }
 }
 
+/** One line of plain text cut to `maxLength`, with spoilers left hidden. */
+export function excerptHtml(html: string | null | undefined, maxLength: number): string {
+  const { body } = new DOMParser().parseFromString(expandAniListMarkdown(html ?? ''), 'text/html');
+  body.querySelectorAll('.markdown_spoiler').forEach((hiddenText) => hiddenText.replaceWith('[spoiler]'));
+  const text = body.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}…` : text;
+}
+
 /** Plain text for places where markup can't be shown (tooltips, single-line previews). */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return '';

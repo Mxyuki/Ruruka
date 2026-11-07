@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PublicListEntry } from '../../api/types';
   import Icon from '../../components/Icon.svelte';
-  import { formatEnum, formatUserScore, statusColor } from '../../lib/format';
+  import { formatEnum, formatProgress, formatUserScore, statusColor } from '../../lib/format';
   import { mediaPath } from '../../lib/routes';
   import { library } from '../../state/library.svelte';
   import { mediaList, totalUnits } from '../../state/mediaList.svelte';
@@ -43,7 +43,7 @@
   <span class="format">{formatEnum(media.format)}</span>
   <span class="score">{formatUserScore(entry.score, session.scoreFormat)}</span>
   <span class="progress">
-    {entry.progress}{total ? ` / ${total}` : ''}
+    {formatProgress(entry.progress, total, media)}
     {#if isEditable && (!total || entry.progress < total)}
       <button class="btn btn-ghost btn-sm" type="button" title="+1" disabled={isSaving} onclick={increment}><Icon name="plus" size={12} /></button>
     {/if}
@@ -64,7 +64,7 @@
   /* <-- Chaque dossier est une bande de papier cernée d'encre, avec une pastille de statut --> */
   .row {
     display: grid;
-    grid-template-columns: 16px 40px minmax(0, 1fr) 90px 70px 120px 80px;
+    grid-template-columns: 16px 40px minmax(0, 1fr) 90px 70px 160px 80px;
     align-items: center;
     gap: var(--space3);
     padding: 6px var(--space3);

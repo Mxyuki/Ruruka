@@ -5,12 +5,14 @@
     value: number;
     min?: number;
     max?: number | null;
+    /** Units out so far, shown after `max` while a series airs. Never limits the value. */
+    released?: number | null;
     step?: number;
     label: string;
     onchange: (value: number) => void;
   }
 
-  let { value, min = 0, max = null, step = 1, label, onchange }: Props = $props();
+  let { value, min = 0, max = null, released = null, step = 1, label, onchange }: Props = $props();
   const decimals = $derived(step < 1 ? 1 : 0);
 
   function set(requested: number) {
@@ -35,7 +37,11 @@
     value={value.toFixed(decimals)}
     onchange={(event) => set(Number(event.currentTarget.value) || min)}
   />
-  {#if max}<span class="max">/ {max}</span>{/if}
+  {#if released !== null}
+    <span class="max" title="Déjà sortis">/ {max ?? '?'} [{released}]</span>
+  {:else if max}
+    <span class="max">/ {max}</span>
+  {/if}
   <button class="btn btn-ghost btn-sm" type="button" aria-label="Augmenter : {label}" disabled={max !== null && value >= max} onclick={() => set(value + step)}>
     <Icon name="plus" size={14} />
   </button>

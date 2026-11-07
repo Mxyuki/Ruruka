@@ -1,6 +1,6 @@
 <script lang="ts">
   import { listStatuses, type FuzzyDate, type ListEntryChanges, type MediaSummary } from '../api/types';
-  import { formatListStatus } from '../lib/format';
+  import { airedEpisodeCount, formatListStatus } from '../lib/format';
   import { mediaList, totalUnits } from '../state/mediaList.svelte';
   import { session } from '../state/session.svelte';
   import { toasts } from '../state/toasts.svelte';
@@ -98,7 +98,7 @@
 
     <div class="field">
       <span class="field-label">Progression</span>
-      <NumberStepper label="progression" value={draft.progress} max={totalUnits(media)} onchange={(value) => (draft.progress = value)} />
+      <NumberStepper label="progression" value={draft.progress} max={totalUnits(media)} released={airedEpisodeCount(media)} onchange={(value) => (draft.progress = value)} />
     </div>
 
     <div class="field">

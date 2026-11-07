@@ -17,6 +17,7 @@ export const routes: RouteDefinition[] = [
   { pattern: '/staff/:id', load: page(() => import('../pages/staff/StaffPage.svelte')) },
   { pattern: '/studio/:id', load: page(() => import('../pages/studio/StudioPage.svelte')) },
   { pattern: '/social', load: page(() => import('../pages/social/SocialPage.svelte')) },
+  { pattern: '/activity/:id', load: page(() => import('../pages/activity/ActivityPage.svelte')) },
   { pattern: '/notifications', load: page(() => import('../pages/notifications/NotificationsPage.svelte')) },
   { pattern: '/user/:name', load: page(() => import('../pages/profile/ProfilePage.svelte')) },
   { pattern: '/user/:name/social', load: page(() => import('../pages/profile/UserSocialPage.svelte')) },
@@ -34,13 +35,15 @@ export const mediaPath = (id: number) => `/media/${id}`;
 export const characterPath = (id: number) => `/character/${id}`;
 export const staffPath = (id: number) => `/staff/${id}`;
 export const studioPath = (id: number) => `/studio/${id}`;
+/** With `replyId`, the page opens on that reply. */
+export const activityPath = (id: number, replyId?: number) => `/activity/${id}${replyId ? `?reply=${replyId}` : ''}`;
 export const userPath = (name: string) => `/user/${encodeURIComponent(name)}`;
 type ProfileSection = 'social' | 'stats' | 'reviews' | 'compare';
 export const userSectionPath = (name: string, section: ProfileSection) => `${userPath(name)}/${section}`;
 export const userListPath = (name: string, type: MediaType) => `${userPath(name)}/list/${type === 'MANGA' ? 'manga' : 'anime'}`;
 export const aboutEditorPath = '/about/edit';
 
-const anilistLink = /^https?:\/\/anilist\.co\/(anime|manga|character|staff|studio|user)\/([^/?#]+)/;
+const anilistLink = /^https?:\/\/anilist\.co\/(anime|manga|character|staff|studio|user|activity)\/([^/?#]+)/;
 
 /** Maps an anilist.co URL to the matching in-app route, or null when there is none. */
 export function internalPathFor(url: string): string | null {
@@ -61,7 +64,7 @@ export function anilistUrlFor(path: string): string | null {
   const [pathname = ''] = path.split('?');
   const [kind, id, section, listType] = pathname.split('/').filter(Boolean);
   if (!id) return kind === 'people' ? `${anilistSite}/search/characters` : null;
-  if (kind === 'character' || kind === 'staff' || kind === 'studio') return `${anilistSite}/${kind}/${id}`;
+  if (kind === 'character' || kind === 'staff' || kind === 'studio' || kind === 'activity') return `${anilistSite}/${kind}/${id}`;
   if (kind === 'search') return `${anilistSite}/search/${id}`;
   if (kind !== 'user') return null;
   if (section === 'social' || section === 'reviews') return `${anilistSite}/user/${id}/${section}`;

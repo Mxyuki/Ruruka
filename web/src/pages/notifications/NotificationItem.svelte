@@ -22,12 +22,12 @@
     [/^replied to your activity.?$/i, ' a répondu à ton activité.'],
     [/^replied to activity you're subscribed to.?$/i, ' a répondu à une activité que tu suis.'],
     [/^liked your activity.?$/i, ' a aimé ton activité.'],
-    [/^liked your activity reply.?$/i, ' a aimé ta réponse.'],
-    [/^liked your comment.?$/i, ' a aimé ton commentaire.'],
-    [/^liked your forum thread.?$/i, ' a aimé ton sujet du forum.'],
-    [/^mentioned you in a forum comment.?$/i, " t'a mentionné·e sur le forum."],
-    [/^replied to your forum comment.?$/i, ' a répondu à ton commentaire sur le forum.'],
-    [/^commented in your subscribed forum thread.?$/i, ' a commenté un sujet que tu suis.'],
+    [/^liked your activity reply.?$/i, ' a aimé ton commentaire.'],
+    [/^liked your comment/i, ' a aimé ton commentaire sur le forum.'],
+    [/^liked your forum thread/i, ' a aimé ton sujet du forum.'],
+    [/^mentioned you.*forum/i, " t'a mentionné·e sur le forum."],
+    [/^replied to your (forum )?comment/i, ' a répondu à ton commentaire sur le forum.'],
+    [/^commented in your subscribed forum thread/i, ' a commenté un sujet que tu suis.'],
     [/^was recently added to the site.?$/i, ' vient d’être ajouté sur AniList.'],
     [/^received site data changes.?$/i, ' a été mis à jour sur AniList.'],
   ];
@@ -58,7 +58,16 @@
     <span></span>
   {:else if notification.kind === 'user'}
     <a href="#{userPath(notification.user.name)}"><img class="avatar" src={notification.user.avatar.medium} alt="" loading="lazy" /></a>
-    <p><a class="title" href="#{userPath(notification.user.name)}">{notification.user.name}</a>{translate(notification.text)}</p>
+    {@const { target } = notification}
+    <p>
+      <a class="title" href="#{userPath(notification.user.name)}">{notification.user.name}</a>{#if !target}{translate(notification.text)}{:else}{translate(notification.text).replace(/\.$/, '')}
+        {#if 'siteUrl' in target}
+          <a class="title" href={target.siteUrl} target="_blank" rel="noopener noreferrer">{target.label}</a>
+        {:else}
+          <a class="title" href="#{target.path}">{target.label}</a>
+        {/if}
+      {/if}
+    </p>
     <span></span>
   {:else}
     <span class="placeholder"><Icon name="bell" /></span>
@@ -102,6 +111,7 @@
 
   p {
     color: var(--textSoft);
+    overflow-wrap: anywhere;
   }
 
   .title {

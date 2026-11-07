@@ -2,7 +2,7 @@
   import type { ListEntry } from '../../api/types';
   import Icon from '../../components/Icon.svelte';
   import Sticker from '../../components/Sticker.svelte';
-  import { formatCountdown } from '../../lib/format';
+  import { formatCountdown, formatProgress } from '../../lib/format';
   import { episodeSearchUrl } from '../../lib/searchSite';
   import { siteName } from '../../lib/siteAddress';
   import { mediaPath } from '../../lib/routes';
@@ -18,7 +18,6 @@
 
   const media = $derived(entry.media);
   const nextEpisode = $derived(entry.progress + 1);
-  const total = $derived(media.episodes);
   const airing = $derived(media.nextAiringEpisode);
   const isWaitingForAiring = $derived(Boolean(airing && nextEpisode >= airing.episode));
 </script>
@@ -48,7 +47,7 @@
             <Icon name="search" size={14} /> Chercher l'ép. {nextEpisode}
           </a>
         {/if}
-        <span class="progress">{entry.progress}{total ? ` / ${total}` : ''} vus</span>
+        <span class="progress">{formatProgress(entry.progress, media.episodes, media)} vus</span>
       </div>
     </div>
   </div>

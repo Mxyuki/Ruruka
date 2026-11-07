@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { deleteActivity, type Activity } from '../api/queries/activity';
   import { formatRelativeTime, formatScoreOutOf } from '../lib/format';
   import { sanitizeHtml } from '../lib/html';
@@ -15,13 +16,17 @@
     activity: Activity;
     /** Tighter layout for side columns. */
     compact?: boolean;
+    /** Shows the replies from the start. */
+    expanded?: boolean;
+    /** The reply to bring into view and mark. */
+    focusedReplyId?: number | null;
     /** Called once the viewer has deleted this activity. */
     ondeleted?: () => void;
   }
 
-  let { activity = $bindable(), compact = false, ondeleted }: Props = $props();
+  let { activity = $bindable(), compact = false, expanded = false, focusedReplyId = null, ondeleted }: Props = $props();
 
-  let showsReplies = $state(false);
+  let showsReplies = $state(untrack(() => expanded));
   let isEditing = $state(false);
   const isOwn = $derived(activity.user.id === session.viewer?.id);
 
@@ -102,7 +107,7 @@
     </div>
 
     {#if showsReplies}
-      <ActivityReplies activityId={activity.id} onreplied={() => activity.replyCount++} />
+      <ActivityReplies activityId={activity.id} {focusedReplyId} onreplied={() => activity.replyCount++} />
     {/if}
   </div>
 

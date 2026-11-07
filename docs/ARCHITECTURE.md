@@ -371,6 +371,8 @@ asks `Page.mediaList(userId_in, mediaId_in)` for the pairs of completed, rewatch
 combination, so only the activities' own pairs are kept, up to 3 pages of 50) and shows the user's current score
 next to the title. The feed query also brings `likes` so hovering a heart lists who liked, with no request per hover.
 
+**Notification targets.** `fetchNotifications` asks each notification what it points at and turns it into a `target`, a label plus a link. A liked list activity names the media and opens it. A status, a message or a reply quotes a plain-text excerpt (`excerptHtml`, spoilers hidden) and opens `/activity/:id`, the one page showing an activity with its replies open. The `activity` field of a notification can come without its media, so the notifications only bring `activityId`, and a second query reads those activities with `activities(id_in:)`. AniList doesn't say which reply was liked either, so that query also brings the replies, and the viewer's latest one liked by that user is picked; `?reply=` brings it into view. The app has no forum, so forum targets open `siteUrl` in the browser. Liked forum comments quote the comment, the rest quote the thread title.
+
 **Even grids.** Profile favourites (25 per kind, like anilist.co) use `pages/profile/FavouriteGrid.svelte`: as many
 columns as fit, then equal rows (25 → 9 + 9 + 7), the short row centered. The media page's characters show as many
 full rows as fit around 12 (12 on 4 columns, 15 on 5), and balance the rows when expanded.
@@ -399,14 +401,14 @@ full rows as fit around 12 (12 on 4 columns, 15 on 5), and balance the rows when
 |---|---|
 | Login (OAuth implicit grant) | ✅ |
 | Home: continue watching (ready-to-play first), random pick (watching / planning / any popular anime not completed), airing soon (watching, or planned when episode 1 airs), season trends linking to a filtered Explorer, friends' activity | ✅ |
-| Anime / manga list with status tabs, filter, sort, inline +1, airing anime grouped first | ✅ |
+| Anime / manga list with status tabs, filter, sort, inline +1, airing anime grouped first, episodes out so far on airing anime | ✅ |
 | Media page (restructured header, relations, characters, staff, stats, friends, tags, trailer, recommendations) | ✅ |
 | Calendar: airing dates of watched anime (announced, then forecast), first episodes of planned anime, hidden anime, personal events repeating over several weeks with an attached anime and episode pace | ✅ |
 | List entry editor (status, progress, score, dates, repeat, notes, private) | ✅ |
 | Browse / search with filters, several genres / tags (required or excluded), minimum % per tag, list status labels and filter | ✅ |
 | Character, staff (every voiced character once, first appearance), studio pages | ✅ |
 | People search (characters, seiyuu, staff) | ✅ |
-| Notifications with search buttons | ✅ |
+| Notifications with search buttons, naming and linking what was liked or answered | ✅ |
 | Profile overview, favourites, rich "about" (images, centered blocks, click-to-reveal spoilers, YouTube players), recent activity | ✅ |
 | About editor (`/about/edit`): markdown/HTML draft, live preview, tag guide with insert buttons | ✅ |
 | Live profile: about updated from mpv playback through local template tags | ✅ |

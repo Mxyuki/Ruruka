@@ -17,7 +17,7 @@
   async function loadMore() {
     isLoading = true;
     try {
-      const result = await fetchNotifications(page + 1);
+      const result = await fetchNotifications(session.viewer?.id ?? 0, page + 1);
       notifications = [...notifications, ...result.notifications];
       page = result.pageInfo.currentPage;
       hasNextPage = result.pageInfo.hasNextPage;

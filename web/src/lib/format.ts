@@ -38,6 +38,19 @@ export const formatSeason = (season: MediaSeason) => seasonLabels[season];
 
 export const unitLabel = (type: MediaType) => (type === 'MANGA' ? 'Chapitre' : 'Épisode');
 
+/** Episodes out so far on a series still airing; null once finished, before episode 1 or without a schedule. */
+export function airedEpisodeCount(media: Pick<MediaSummary, 'nextAiringEpisode'>): number | null {
+  const airedCount = (media.nextAiringEpisode?.episode ?? 1) - 1;
+  return airedCount > 0 ? airedCount : null;
+}
+
+/** "3 / 12", or "3 / 12 [5]" while the series airs: seen / announced [out so far]. */
+export function formatProgress(progress: number, total: number | null, media: Pick<MediaSummary, 'nextAiringEpisode'>): string {
+  const airedCount = airedEpisodeCount(media);
+  if (airedCount !== null) return `${progress} / ${total ?? '?'} [${airedCount}]`;
+  return total ? `${progress} / ${total}` : String(progress);
+}
+
 export const pluralize = (count: number, word: string) => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
 
 const compactFormatter = new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 });
