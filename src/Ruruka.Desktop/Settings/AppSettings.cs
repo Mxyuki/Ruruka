@@ -1,3 +1,5 @@
+using Ruruka.Desktop.Capture;
+
 namespace Ruruka.Desktop.Settings;
 
 /// <summary>Everything persisted in settings.json.</summary>
@@ -36,6 +38,30 @@ public sealed record AppSettings
 
     /// <summary>The capture workshop offers to cut a clip from the episode file.</summary>
     public bool IsClipEnabled { get; init; } = true;
+
+    /// <summary>"mpv" cuts clips with the player's own encoder; "ffmpeg" runs the chosen <see cref="ClipPreset"/> (needs the downloaded ffmpeg).</summary>
+    public string ClipEngine { get; init; } = "mpv";
+
+    /// <summary>The preset ffmpeg clips are cut with; a deleted one falls back to « Qualité max ».</summary>
+    public string ClipPresetId { get; init; } = ClipPresetCatalog.MaxId;
+
+    /// <summary>The user's own ffmpeg presets; the built-in ones are not stored.</summary>
+    public IReadOnlyList<ClipPreset> ClipPresets { get; init; } = [];
+
+    /// <summary>The player's bar shows « précédent » and « suivant » arrows when those episodes are in the library.</summary>
+    public bool AreEpisodeArrowsShown { get; init; } = true;
+
+    /// <summary>In the last seconds of an episode, the player offers the next one in a card (not during a chain of episodes).</summary>
+    public bool IsNextEpisodePromptShown { get; init; } = true;
+
+    /// <summary>Where a new player window opens: "app" (the monitor of Ruruka), "fixed" (<see cref="PlayerScreenName"/>) or "last" (where it was closed).</summary>
+    public string PlayerScreenMode { get; init; } = "app";
+
+    /// <summary>The Windows device name of the monitor used by the "fixed" mode.</summary>
+    public string PlayerScreenName { get; init; } = "";
+
+    /// <summary>Where the player window was last seen; kept for the "last" mode and never sent to the UI.</summary>
+    public Player.PlayerWindowPlacement? PlayerWindow { get; init; }
 
     /// <summary>Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations.</summary>
     public bool IsDiscordPresenceShown { get; init; } = true;
@@ -118,7 +144,14 @@ public sealed record AppSettings
         ThemeDarkFromMinute,
         SearchSiteUrl,
         MangaSiteUrl,
-        SongFileHostUrl);
+        SongFileHostUrl,
+        ClipEngine,
+        ClipPresetId,
+        ClipPresetCatalog.All(ClipPresets),
+        AreEpisodeArrowsShown,
+        IsNextEpisodePromptShown,
+        PlayerScreenMode,
+        PlayerScreenName);
 }
 
 /// <summary>The settings the UI may see: the token is reduced to whether one exists.</summary>
@@ -152,7 +185,14 @@ public sealed record PublicSettings(
     int ThemeDarkFromMinute,
     string SearchSiteUrl,
     string MangaSiteUrl,
-    string SongFileHostUrl);
+    string SongFileHostUrl,
+    string ClipEngine,
+    string ClipPresetId,
+    IReadOnlyList<ClipPreset> ClipPresets,
+    bool AreEpisodeArrowsShown,
+    bool IsNextEpisodePromptShown,
+    string PlayerScreenMode,
+    string PlayerScreenName);
 
 /// <summary>A partial update from the UI; null fields are left unchanged.</summary>
 public sealed record SettingsPatch
@@ -197,4 +237,15 @@ public sealed record SettingsPatch
 
     /// <summary>An empty string hides the song players.</summary>
     public string? SongFileHostUrl { get; init; }
+
+    public string? ClipEngine { get; init; }
+    public string? ClipPresetId { get; init; }
+
+    /// <summary>The user's presets, replacing the previous ones; built-in presets are ignored.</summary>
+    public IReadOnlyList<ClipPreset>? ClipPresets { get; init; }
+
+    public bool? AreEpisodeArrowsShown { get; init; }
+    public bool? IsNextEpisodePromptShown { get; init; }
+    public string? PlayerScreenMode { get; init; }
+    public string? PlayerScreenName { get; init; }
 }

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { fetchCharacter, type CharacterDetails } from '../../api/queries/people';
   import type { NamedNode } from '../../api/types';
+  import { toggleFavourite } from '../../api/queries/favourites';
   import DetailLayout from '../../components/DetailLayout.svelte';
+  import FavouriteButton from '../../components/FavouriteButton.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
@@ -52,6 +54,9 @@
       ['Favoris', character.favourites.toLocaleString('fr-FR')],
     ]}
   >
+    {#snippet actions()}
+      <FavouriteButton isFavourite={character.isFavourite} ontoggle={() => toggleFavourite('character', character.id)} />
+    {/snippet}
     {#if voices.length}
       <Section title={voices.length > 1 ? 'Ses voix' : 'Sa voix'}>
         <div class="voices">

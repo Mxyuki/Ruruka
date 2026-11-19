@@ -12,6 +12,7 @@ internal sealed class PlayerModule(PlayerService player) : IBridgeModule
             player.SetPlayerPath(parameters.Path);
             return Task.FromResult(true);
         });
+        router.Register("player.screens", () => Task.FromResult(player.ListScreens()));
         router.Register<PlaybackTarget, bool>("player.play", async target =>
         {
             await player.PlayAsync(target);

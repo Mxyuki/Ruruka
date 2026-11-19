@@ -4,6 +4,7 @@
 local hideDelaySeconds = 2
 local refreshSeconds = 0.5
 local seekStepSeconds = 10
+local promptSeconds = 10
 
 local colors = {
     ink = '301E2B',
@@ -26,6 +27,8 @@ local icons = {
     camera = 'm 3 7 l 7 7 l 9 4 l 15 4 l 17 7 l 21 7 l 21 19 l 3 19 m 8 13 l 12 17 l 16 13 l 12 9',
     minimize = 'm 5 17 l 19 17 l 19 20 l 5 20',
     maximize = 'm 4 4 l 20 4 l 20 20 l 4 20 m 7 7 l 7 17 l 17 17 l 17 7',
+    previous = 'm 5 4 l 8 4 l 8 20 l 5 20 m 20 4 l 20 20 l 9 12',
+    next = 'm 4 4 l 15 12 l 4 20 m 16 4 l 19 4 l 19 20 l 16 20',
     close = 'm 5 7 l 7 5 l 12 10 l 17 5 l 19 7 l 14 12 l 19 17 l 17 19 l 12 14 l 7 19 l 5 17 l 10 12',
 }
 
@@ -42,6 +45,11 @@ local state = {
     zones = {},
     tracks = {},
     chapters = {},
+    previousEpisode = nil,
+    nextEpisode = nil,
+    promptEpisode = nil,
+    isPromptDismissed = false,
+    isPromptActive = false,
 }
 local hideTimer
 local refreshTimer
@@ -173,6 +181,27 @@ local function labelButton(canvas, x, y, height, text, unit, onClick, isActive)
 end
 
 local isCaptureEnabled = mp.get_opt('ruruka-capture') ~= 'no'
+
+-- <-- Ce que l'application propose autour de cet épisode : elle seule sait quels fichiers existent (un numéro d'épisode, ou « no ») -->
+local function readNavigation()
+    state.previousEpisode = tonumber(mp.get_opt('ruruka-previous'))
+    state.nextEpisode = tonumber(mp.get_opt('ruruka-next'))
+    state.promptEpisode = tonumber(mp.get_opt('ruruka-prompt'))
+    state.isPromptDismissed = false
+    state.isPromptActive = false
+end
+
+local function requestEpisode(direction)
+    mp.commandv('script-message', 'ruruka-episode', direction)
+end
+
+-- <-- La carte « épisode suivant » n'existe que dans les dernières secondes ; le temps restant sert aussi de décompte -->
+local function promptRemaining()
+    if not state.promptEpisode or state.isPromptDismissed then return nil end
+    local remaining = mp.get_property_number('time-remaining')
+    if remaining and remaining <= promptSeconds then return math.max(remaining, 0) end
+    return nil
+end
 
 -- <-- Capture : l'image se fige, puis l'application Ruruka ouvre son atelier (image ou clip) -->
 local function requestCapture()
@@ -398,6 +427,10 @@ local function drawBar(canvas, width, height, unit)
     local rowY = y0 + 52 * unit
     local rowHeight = 42 * unit
     local cursor = x0 + padding - 6 * unit
+    if state.previousEpisode then
+        iconButton(canvas, cursor, rowY, rowHeight, 'previous', function() requestEpisode('previous') end)
+        cursor = cursor + rowHeight + 4 * unit
+    end
     cursor = cursor + labelButton(canvas, cursor, rowY, rowHeight, '-10', unit, function()
         mp.commandv('seek', -seekStepSeconds, 'relative', 'exact')
     end) + 4 * unit
@@ -407,7 +440,12 @@ local function drawBar(canvas, width, height, unit)
     cursor = cursor + rowHeight + 4 * unit
     cursor = cursor + labelButton(canvas, cursor, rowY, rowHeight, '+10', unit, function()
         mp.commandv('seek', seekStepSeconds, 'relative', 'exact')
-    end) + 12 * unit
+    end) + 4 * unit
+    if state.nextEpisode then
+        iconButton(canvas, cursor, rowY, rowHeight, 'next', function() requestEpisode('next') end)
+        cursor = cursor + rowHeight + 4 * unit
+    end
+    cursor = cursor + 8 * unit
     if not isCompact then
         drawVolume(canvas, cursor, rowY, 170 * unit, unit)
     end
@@ -433,6 +471,29 @@ local function drawBar(canvas, width, height, unit)
     end
 
     drawMenu(canvas, x1, y0 - 16 * unit, unit)
+end
+
+local function drawNextPrompt(canvas, width, height, unit, remaining)
+    local margin = 22 * unit
+    local cardWidth = 430 * unit
+    local cardHeight = 92 * unit
+    local x1 = width - margin
+    local x0 = x1 - cardWidth
+    local y1 = height - margin - 104 * unit - 28 * unit
+    local y0 = y1 - cardHeight
+
+    addZone(x0, y0, x1, y1, { isPrompt = true })
+    drawSticker(canvas, x0, y0, x1, y1, 18 * unit, unit)
+    canvas.text(x0 + 22 * unit, y0 + 31 * unit, 'Épisode suivant', 24 * unit, colors.text, 4)
+    local countdown = remaining > 0.5 and string.format('Épisode %d · dans %d s', state.promptEpisode, math.ceil(remaining)) or string.format('Épisode %d', state.promptEpisode)
+    canvas.text(x0 + 22 * unit, y0 + 62 * unit, countdown, 19 * unit, colors.soft, 4, 'Courier Prime')
+
+    local buttonHeight = 42 * unit
+    local buttonY = y0 + (cardHeight - buttonHeight) / 2
+    local closeSize = 40 * unit
+    local watchWidth = labelWidth('Regarder', 21 * unit) + 24 * unit
+    labelButton(canvas, x1 - closeSize - 14 * unit - watchWidth, buttonY, buttonHeight, 'Regarder', unit, function() requestEpisode('next') end, true)
+    iconButton(canvas, x1 - closeSize - 6 * unit, y0 + (cardHeight - closeSize) / 2, closeSize, 'close', function() state.isPromptDismissed = true end)
 end
 
 local function drawWindowControls(canvas, width, unit)
@@ -499,7 +560,8 @@ end
 
 local function render()
     state.zones = {}
-    if not state.isVisible then
+    local remaining = promptRemaining()
+    if not state.isVisible and not remaining then
         overlay.data = ''
         overlay:update()
         setInputActive(false)
@@ -511,8 +573,11 @@ local function render()
     overlay.res_y = height
     local unit = clamp(height / 1080, 0.65, 1.8)
     local canvas = newCanvas()
-    drawHeader(canvas, width, unit)
-    drawBar(canvas, width, height, unit)
+    if state.isVisible then
+        drawHeader(canvas, width, unit)
+        drawBar(canvas, width, height, unit)
+    end
+    if remaining then drawNextPrompt(canvas, width, height, unit, remaining) end
     drawBuffering(canvas, width, height, unit)
     overlay.data = canvas.result()
     overlay:update()
@@ -526,7 +591,7 @@ end
 local function hide()
     if isAlwaysVisible() then return end
     state.isVisible = false
-    refreshTimer:stop()
+    if not promptRemaining() then refreshTimer:stop() end
     render()
 end
 
@@ -610,6 +675,7 @@ refreshTimer = mp.add_periodic_timer(refreshSeconds, function()
         hideTimer:resume()
     end
     render()
+    if not state.isVisible and not promptRemaining() then refreshTimer:stop() end
 end)
 refreshTimer:stop()
 
@@ -661,4 +727,18 @@ mp.observe_property('pause', 'bool', function(_, isPaused)
     if isPaused then show() end
 end)
 
+-- <-- La carte se lève une seule fois, quand le temps restant passe sous le seuil : la minuterie de rafraîchissement prend ensuite le relais -->
+mp.observe_property('time-remaining', 'number', function()
+    local isDue = promptRemaining() ~= nil
+    if isDue and not state.isPromptActive then
+        state.isPromptActive = true
+        refreshTimer:resume()
+        render()
+    elseif not isDue then
+        state.isPromptActive = false
+    end
+end)
+
+readNavigation()
+mp.register_event('file-loaded', readNavigation)
 mp.register_event('file-loaded', show)

@@ -16,6 +16,9 @@ internal sealed class UpdateService
 
     public static Version CurrentVersion { get; } = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
 
+    /// <summary>The running version as shown to the user, e.g. 0.17.0.</summary>
+    public static string CurrentVersionLabel => Format(CurrentVersion);
+
     // <-- Après CurrentVersion : les champs statiques s'initialisent dans l'ordre du fichier et le User-Agent en a besoin -->
     private static readonly HttpClient Http = CreateClient();
 

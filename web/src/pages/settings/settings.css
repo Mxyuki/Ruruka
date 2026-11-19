@@ -1,0 +1,38 @@
+/* <-- Pièces communes des cartes de réglages --> */
+.settings-card {
+  position: relative;
+  margin-bottom: var(--space4);
+  padding: var(--space5);
+}
+
+.settings-hint {
+  margin: calc(var(--space2) * -1) 0 var(--space3);
+  color: var(--textFaint);
+  font-size: var(--fontSizeSm);
+}
+
+.settings-option {
+  margin-top: var(--space4);
+}
+
+.settings-subtitle {
+  margin: var(--space5) 0 var(--space3);
+  font-size: var(--fontSizeSm);
+  font-weight: 800;
+}
+
+.settings-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space2);
+}
+
+.settings-choices .chip {
+  border: 0;
+  background: var(--colorSunken);
+  cursor: pointer;
+}
+
+.settings-choices .chip.is-active {
+  background: var(--colorBlond);
+}

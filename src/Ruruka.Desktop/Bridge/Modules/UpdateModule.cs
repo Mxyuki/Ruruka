@@ -7,6 +7,7 @@ internal sealed class UpdateModule(UpdateService updates, Action<string> onInsta
 {
     public void Register(BridgeRouter router)
     {
+        router.Register("update.version", () => Task.FromResult(UpdateService.CurrentVersionLabel));
         router.Register("update.check", updates.CheckAsync);
         router.Register("update.install", async () =>
         {

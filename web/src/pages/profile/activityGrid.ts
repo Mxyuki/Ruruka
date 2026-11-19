@@ -20,7 +20,8 @@ export interface ActivityGrid {
 
 const dayMs = 24 * 60 * 60 * 1000;
 const weekDays = 7;
-const daysShown = 365;
+// <-- AniList ne renvoie que six mois d'historique : au-delà, les jours vides seraient faux et non calmes -->
+const monthsShown = 6;
 
 // <-- Un jour calme n'a pas de couleur ; ensuite, quatre paliers de plus en plus soutenus -->
 export function levelOf(amount: number): number {
@@ -44,11 +45,11 @@ function describe(date: Date, amount: number): string {
 
 const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 
-/** The last year of activity as weeks of seven days, ending on `today`. */
+/** The last six months of activity (all AniList gives) as weeks of seven days, ending on `today`. */
 export function buildActivityGrid(history: ActivityDay[], today = new Date()): ActivityGrid {
   const amounts = new Map(history.map(({ date, amount }) => [keyOfHistoryDay(date), amount]));
   const lastDay = addDays(today, 0);
-  const firstDay = addDays(lastDay, -(daysShown - 1));
+  const firstDay = new Date(lastDay.getFullYear(), lastDay.getMonth() - monthsShown, lastDay.getDate());
   const gridStart = addDays(firstDay, -((firstDay.getDay() + 6) % weekDays));
   const weekCount = Math.ceil((Math.round((lastDay.getTime() - gridStart.getTime()) / dayMs) + 1) / weekDays);
 

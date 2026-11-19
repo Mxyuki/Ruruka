@@ -17,6 +17,7 @@
   import { installSparkles } from './lib/sparkle';
   import { installSpoilers } from './lib/spoilers';
   import SetupPage from './pages/setup/SetupPage.svelte';
+  import { ffmpeg } from './state/ffmpeg.svelte';
   import { groupWatch } from './state/groupWatch.svelte';
   import { capture } from './state/capture.svelte';
   import { library } from './state/library.svelte';
@@ -86,6 +87,7 @@
     groupWatch.init();
     watchStream.init();
     capture.init();
+    ffmpeg.init();
     void session.init();
     void updates.check();
     // <-- Avant de quitter : la séance est prévenue, le profil repasse au repos, puis le host peut fermer -->

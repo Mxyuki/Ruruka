@@ -1,5 +1,5 @@
 import type { MediaSummary } from '../api/types';
-import { invoke, on, type SharedFile } from '../lib/bridge';
+import { invoke, on, type EpisodeNavigation, type SharedFile } from '../lib/bridge';
 import { library } from './library.svelte';
 import { mediaList } from './mediaList.svelte';
 import { session } from './session.svelte';
@@ -42,6 +42,7 @@ class Playback {
   init(): void {
     on('player.watched', ({ mediaId, episode }) => this.handleWatched(mediaId, episode));
     on('player.ended', ({ mediaId, episode }) => this.handleEnded(mediaId, episode));
+    on('player.episodeRequested', ({ mediaId, episode, direction }) => void this.changeEpisode(mediaId, episode, direction));
     on('player.closed', ({ mediaId, episode }) => this.handleClosed(mediaId, episode));
   }
 
@@ -98,7 +99,33 @@ class Playback {
     }
     const title = media.title.userPreferred;
     const coverUrl = media.coverImage.large;
-    return this.launch(media, episode, isShared, () => invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title, coverUrl }));
+    const navigation = isShared ? undefined : this.navigationFor(media.id, episode);
+    return this.launch(media, episode, isShared, () => invoke('player.play', { mediaId: media.id, episode, filePath: file.path, title, coverUrl, navigation }));
+  }
+
+  // <-- Les flèches suivent les fichiers du dossier ; la carte de fin ne se lève qu'au bout d'un enchaînement, jamais entre deux épisodes qui s'enchaînent seuls -->
+  private navigationFor(mediaId: number, episode: number): EpisodeNavigation {
+    const settings = session.settings;
+    const previous = this.hasEpisodeFile(mediaId, episode - 1) ? episode - 1 : null;
+    const next = this.hasEpisodeFile(mediaId, episode + 1) ? episode + 1 : null;
+    const isChainRunning = this.playlist?.mediaId === mediaId && episode < this.playlist.lastEpisode;
+    const hasArrows = settings?.areEpisodeArrowsShown ?? true;
+    const hasPrompt = (settings?.isNextEpisodePromptShown ?? true) && !isChainRunning;
+    return { previousEpisode: hasArrows ? previous : null, nextEpisode: hasArrows ? next : null, promptEpisode: hasPrompt ? next : null };
+  }
+
+  /** The player's arrows: plays the previous or next episode of the one on screen, when its file is in the library. */
+  private async changeEpisode(mediaId: number, episode: number, direction: 'previous' | 'next'): Promise<void> {
+    const current = this.sessions.get(sessionKey(mediaId, episode));
+    if (!current || current.isRemote) return;
+    const target = episode + (direction === 'next' ? 1 : -1);
+    if (target < 1) return;
+    if (!this.hasEpisodeFile(mediaId, target)) {
+      toasts.error(`L’épisode ${target} n’est pas dans ton dossier.`);
+      return;
+    }
+    this.playlist = null;
+    await this.play(current.media, target);
   }
 
   private async launch(media: MediaSummary, episode: number, isShared: boolean, start: () => Promise<boolean>): Promise<boolean> {

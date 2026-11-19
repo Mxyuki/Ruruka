@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { invoke, type CaptureOffer, type ClipFormat, type ClipQuality } from '../../lib/bridge';
   import { fitRatio, fullFrame, isFullFrame, type CropRect } from '../../lib/cropRect';
+  import { formatPreciseClock } from '../../lib/clock';
   import { formatClock } from '../../lib/format';
   import { capture } from '../../state/capture.svelte';
   import { session } from '../../state/session.svelte';
@@ -14,7 +15,7 @@
   import CropFrame from './CropFrame.svelte';
   import ClipPreview from './ClipPreview.svelte';
   import { freeShape, shapes, type Shape } from './cropShapes';
-  import { blobToBase64, cropToPng, pngFromBase64 } from './frameExport';
+  import { blobToBase64, cropToPng, jpegFromBase64, pngFromBase64 } from './frameExport';
 
   let { offer }: { offer: CaptureOffer } = $props();
 
@@ -23,6 +24,7 @@
   const maxClipSeconds = 300;
   const maxPreviewSeconds = 60;
   const defaultClipSeconds = 10;
+  const scrubDelayMs = 200;
 
   let tab = $state<Tab>('image');
   // <-- L'atelier est recréé à chaque nouvelle capture : les valeurs de départ viennent de celle-ci -->
@@ -38,8 +40,15 @@
   let endSeconds = $state(firstOffer.positionSeconds);
   let quality = $state<ClipQuality>('max');
   let format = $state<ClipFormat>('mp4');
+  let scrub = $state<{ url: string; seconds: number } | null>(null);
+  let isScrubLoading = $state(false);
+  let scrubTimer: ReturnType<typeof setTimeout> | undefined;
+  let scrubTicket = 0;
+  let presetId = $state(untrack(() => session.settings?.clipPresetId ?? 'max'));
 
-  const shownUrl = $derived(frameUrls && withSubtitles && frameUrls.subtitled ? frameUrls.subtitled : (frameUrls?.plain ?? null));
+  const frameUrl = $derived(frameUrls && withSubtitles && frameUrls.subtitled ? frameUrls.subtitled : (frameUrls?.plain ?? null));
+  // <-- Dans l'onglet Clip, l'image du dernier point déplacé remplace celle figée, pour choisir les bornes à vue -->
+  const shownUrl = $derived(tab === 'clip' && scrub ? scrub.url : frameUrl);
   // <-- Le clip se coupe dans le fichier de l'épisode : un flux de séance ou le réglage « clip » coupé le ferment -->
   const canClip = $derived(offer.canClip && (session.settings?.isClipEnabled ?? true));
   const isTooLong = $derived(endSeconds - startSeconds > maxClipSeconds);
@@ -66,6 +75,39 @@
       isCurrent = false;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
+  });
+
+  function showScrub(seconds: number) {
+    clearTimeout(scrubTimer);
+    isScrubLoading = true;
+    // <-- Une courte attente évite de lancer une lecture à chaque pixel du glissement -->
+    scrubTimer = setTimeout(() => void loadScrub(seconds), scrubDelayMs);
+  }
+
+  async function loadScrub(seconds: number) {
+    const ticket = ++scrubTicket;
+    try {
+      // <-- mpv ne rend aucune image tout au bout de l'épisode : on s'arrête un instant avant -->
+      const base64 = await capture.loadFrameAt(Math.max(0, Math.min(seconds, offer.durationSeconds - 0.1)), withSubtitles);
+      if (ticket !== scrubTicket || !base64) return;
+      const url = URL.createObjectURL(await jpegFromBase64(base64));
+      if (scrub) URL.revokeObjectURL(scrub.url);
+      scrub = { url, seconds };
+    } catch (error) {
+      if (ticket === scrubTicket) toasts.error(error, 'Impossible d’afficher cette image');
+    } finally {
+      if (ticket === scrubTicket) isScrubLoading = false;
+    }
+  }
+
+  function toggleSubtitles(checked: boolean) {
+    withSubtitles = checked;
+    if (scrub) showScrub(scrub.seconds);
+  }
+
+  onDestroy(() => {
+    clearTimeout(scrubTimer);
+    if (scrub) URL.revokeObjectURL(scrub.url);
   });
 
   function chooseShape(next: Shape) {
@@ -123,6 +165,7 @@
       withSubtitles,
       quality,
       format,
+      presetId,
       fileName,
     });
   }
@@ -161,13 +204,17 @@
     {/each}
     <button class="btn btn-ghost btn-sm" type="button" disabled={isFullFrame(crop)} onclick={resetCrop}>Tout l’écran</button>
     {#if offer.hasSubtitles}
-      <Toggle checked={withSubtitles} label="Sous-titres" onchange={(checked) => (withSubtitles = checked)} />
+      <Toggle checked={withSubtitles} label="Sous-titres" onchange={toggleSubtitles} />
     {/if}
     <span class="size">{outputSize}</span>
   </div>
 
+  {#if tab === 'clip' && scrub}
+    <p class="scrub">Image à {formatPreciseClock(scrub.seconds)}{isScrubLoading ? ' · chargement…' : ''}</p>
+  {/if}
+
   {#if tab === 'clip'}
-    <ClipControls bind:startSeconds bind:endSeconds bind:quality bind:format positionSeconds={offer.positionSeconds} durationSeconds={offer.durationSeconds} />
+    <ClipControls bind:startSeconds bind:endSeconds bind:quality bind:format bind:presetId positionSeconds={offer.positionSeconds} durationSeconds={offer.durationSeconds} onscrub={showScrub} />
     {#if isTooLong}<p class="warning">Un clip dure 5 minutes au plus : raccourcis l’extrait.</p>{/if}
     <ClipPreview request={{ startSeconds, endSeconds, crop: isFullFrame(crop) ? null : crop, withSubtitles }} maxSeconds={maxPreviewSeconds} />
   {/if}
@@ -227,6 +274,13 @@
     color: var(--textSoft);
     font-family: var(--fontFile);
     font-size: var(--fontSizeSm);
+  }
+
+  .scrub {
+    margin: calc(var(--space2) * -1) 0 var(--space3);
+    color: var(--textSoft);
+    font-family: var(--fontFile);
+    font-size: var(--fontSizeXs);
   }
 
   .warning {

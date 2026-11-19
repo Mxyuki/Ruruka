@@ -5,8 +5,9 @@ using Ruruka.Desktop.Bridge;
 namespace Ruruka.Desktop.Capture;
 
 /// <summary>
-/// Cuts a clip with mpv's own encoder, the program already shipped with the player: no ffmpeg to add.
-/// The clip is read from the original file, so it keeps the episode's full quality.
+/// Cuts a clip with mpv's own encoder, the program already shipped with the player: nothing to download.
+/// The clip is read from the original file, so it keeps the episode's full quality. <see cref="FfmpegClipEncoder"/>
+/// is the optional alternative that runs the user's own ffmpeg command.
 /// </summary>
 internal static class ClipEncoder
 {
@@ -22,7 +23,7 @@ internal static class ClipEncoder
     private const int PreviewHeight = 360;
 
     private const string ProgressPrefix = "RURUKA ";
-    private const int DefaultAudioBitsPerSecond = 128_000;
+    internal const int DefaultAudioBitsPerSecond = 128_000;
     private const int PreviewAudioBitsPerSecond = 64_000;
     private const int DiscordLimitBytes = 9_300_000;
     private const int MinimumVideoBitsPerSecond = 150_000;
@@ -109,6 +110,13 @@ internal static class ClipEncoder
         throw new BridgeException("Le clip n'a pas pu être découpé : le lecteur a refusé cet extrait.");
     }
 
+    /// <summary>The video bitrate that keeps a clip of this length, with its audio, under Discord's 10 MB.</summary>
+    internal static long DiscordVideoBitsPerSecond(double durationSeconds)
+    {
+        var totalBitsPerSecond = DiscordLimitBytes * 8 / Math.Max(durationSeconds, 1);
+        return (long)Math.Max(totalBitsPerSecond - DefaultAudioBitsPerSecond, MinimumVideoBitsPerSecond);
+    }
+
     private static bool IsWebm(ClipRequest request) => request.Format == FormatWebm && request.Quality != QualityPreview;
 
     private static int AudioBitsPerSecond(ClipRequest request) => request.Quality == QualityPreview ? PreviewAudioBitsPerSecond : DefaultAudioBitsPerSecond;
@@ -120,8 +128,7 @@ internal static class ClipEncoder
         // <-- VP9 : `cpu-used` et `row-mt` gardent l'encodage à une durée raisonnable sur un clip de quelques minutes -->
         var common = isWebm ? "deadline=good,cpu-used=3,row-mt=1" : "preset=slow,tune=animation";
         if (request.Quality != QualityDiscord) return isWebm ? $"crf=18,b=0,{common}" : $"crf=14,{common}";
-        var totalBitsPerSecond = DiscordLimitBytes * 8 / Math.Max(durationSeconds, 1);
-        var videoBitsPerSecond = (long)Math.Max(totalBitsPerSecond - DefaultAudioBitsPerSecond, MinimumVideoBitsPerSecond);
+        var videoBitsPerSecond = DiscordVideoBitsPerSecond(durationSeconds);
         return string.Create(CultureInfo.InvariantCulture, $"b={videoBitsPerSecond},maxrate={videoBitsPerSecond * 13 / 10},bufsize={videoBitsPerSecond * 2},{common}");
     }
 
@@ -147,7 +154,7 @@ internal static class ClipEncoder
     }
 
     // <-- Sans sous-titres, la piste est coupée ; un fichier externe est rechargé, puisque ce mpv-ci ne cherche rien tout seul -->
-    private static IEnumerable<string> SubtitleArguments(ClipSource source, bool isShown)
+    internal static IEnumerable<string> SubtitleArguments(ClipSource source, bool isShown)
     {
         yield return "--sub-auto=no";
         if (!isShown || source.SubtitleTrackId is not { } track)
@@ -191,5 +198,5 @@ internal static class ClipEncoder
         }
     }
 
-    private static string Format(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    internal static string Format(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 }

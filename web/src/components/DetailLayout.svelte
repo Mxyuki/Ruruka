@@ -8,10 +8,12 @@
     nativeName?: string | null;
     facts: [string, string | null | undefined][];
     description?: string | null;
+    /** Buttons under the facts, such as the favourite toggle. */
+    actions?: Snippet;
     children: Snippet;
   }
 
-  let { image, name, nativeName, facts, description, children }: Props = $props();
+  let { image, name, nativeName, facts, description, actions, children }: Props = $props();
   const visibleFacts = $derived(facts.filter((fact): fact is [string, string] => Boolean(fact[1])));
 </script>
 
@@ -29,6 +31,7 @@
           {/each}
         </dl>
       {/if}
+      {#if actions}<div class="actions">{@render actions()}</div>{/if}
       {#if description}
         <div class="description rich-text">{@html sanitizeHtml(description)}</div>
       {/if}
@@ -39,6 +42,10 @@
 </div>
 
 <style>
+  .actions {
+    margin-top: var(--space3);
+  }
+
   header {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);
