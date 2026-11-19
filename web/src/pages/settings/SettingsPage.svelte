@@ -12,6 +12,7 @@
   import SectionOrderDialog from './SectionOrderDialog.svelte';
   import SitesCard from './SitesCard.svelte';
   import ProfileVideoCard from './ProfileVideoCard.svelte';
+  import RurukaPlayerOptions from './RurukaPlayerOptions.svelte';
   import ThemeCard from './ThemeCard.svelte';
   import UpdateCard from './UpdateCard.svelte';
 
@@ -112,6 +113,8 @@
           onchange={(isDiscordPresenceShown) => update({ isDiscordPresenceShown })}
         />
       </div>
+
+      <RurukaPlayerOptions {update} />
 
       <!-- Quand un épisode compte comme vu -->
       <h3 class="option-title">Épisode vu à</h3>

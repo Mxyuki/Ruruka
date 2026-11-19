@@ -1,7 +1,9 @@
 import { fetchAiredEpisodes, fetchAiringPlans, fetchMediaSummaries } from '../../api/queries/media';
 import type { AiringEpisode, FuzzyDate, ListEntry, MediaSummary } from '../../api/types';
 import { invoke, type CalendarEvent } from '../../lib/bridge';
+import { library } from '../../state/library.svelte';
 import { mediaList } from '../../state/mediaList.svelte';
+import { toasts } from '../../state/toasts.svelte';
 import { forecastEpisodes } from './airingForecast';
 import { addDays, dayKey, episodesForOccurrence, occurrencesBetween, unixSeconds, type EpisodeRange } from './calendarDates';
 
@@ -21,6 +23,8 @@ export interface AiringItem {
   /** A planned anime, shown for its first episode only. */
   isPlanned: boolean;
   isWatched: boolean;
+  /** The episode's file is in a linked library folder. */
+  isOnDisk: boolean;
   sortMinute: number;
 }
 
@@ -94,6 +98,8 @@ class CalendarStore {
     const saved = await invoke('calendar.get');
     this.events = saved.events;
     this.hiddenMediaIds = saved.hiddenMediaIds;
+    // <-- Les dossiers locaux disent quels épisodes manqués sont déjà prêts à être vus -->
+    library.rescan().catch((error) => toasts.error(error, 'Impossible de lire tes dossiers'));
     await this.loadAiringData(firstDay);
   }
 
@@ -169,6 +175,7 @@ class CalendarStore {
           nowSeconds,
         });
         const isPlanned = !isWatching(entry);
+        const episodesOnDisk = library.episodesFor(entry.mediaId);
         return episodes
           .filter(({ episode }) => !isPlanned || episode === 1)
           .map(({ episode, airingAt, isEstimated, isDateOnly }) => ({
@@ -183,6 +190,7 @@ class CalendarStore {
               isDateOnly,
               isPlanned,
               isWatched: entry.progress >= episode,
+              isOnDisk: episodesOnDisk.has(episode),
               sortMinute: isDateOnly ? minutesPerDay : minuteOfDay(airingAt),
             },
           }));

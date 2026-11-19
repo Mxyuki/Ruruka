@@ -1,6 +1,6 @@
 import { cached, invalidate, minuteMs } from '../cache';
 import { gql } from '../client';
-import type { ListEntry, ListEntryChanges, MediaListStatus, MediaSummary, MediaType, PublicListEntry, ScoreFormat } from '../types';
+import type { FuzzyDate, ListEntry, ListEntryChanges, MediaListStatus, MediaSummary, MediaType, PublicListEntry, ScoreFormat } from '../types';
 import { listEntryFields, mediaSummaryFields } from './fragments';
 
 const listCollectionQuery = `
@@ -140,4 +140,46 @@ const deleteEntryMutation = `
 
 export async function deleteListEntry(id: number): Promise<void> {
   await gql(deleteEntryMutation, { id });
+}
+
+/** What Explorer's filters and sorts need about a media of the viewer's list, beyond its summary. */
+export interface ListTraits {
+  genres: string[];
+  tags: { name: string; rank: number }[];
+  popularity: number | null;
+  favourites: number | null;
+  trending: number | null;
+  startDate: FuzzyDate;
+}
+
+const listTraitsQuery = `
+  query ($userId: Int, $type: MediaType) {
+    MediaListCollection(userId: $userId, type: $type, forceSingleCompletedList: true) {
+      lists {
+        entries {
+          mediaId
+          media { genres popularity favourites trending startDate { year month day } tags { name rank } }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Genres, tags and popularity of the viewer's whole list in one call, so Explorer can filter a
+ * status of the list here instead of paging through AniList. `entryCount` keys the cache: a list
+ * that grew is read again.
+ */
+export function fetchListTraits(userId: number, type: MediaType, entryCount: number): Promise<Map<number, ListTraits>> {
+  return cached(`listTraits:${userId}:${type}:${entryCount}`, 10 * minuteMs, async () => {
+    const { MediaListCollection } = await gql<{ MediaListCollection: { lists: { entries: { mediaId: number; media: ListTraits }[] }[] } }>(
+      listTraitsQuery,
+      { userId, type },
+    );
+    const traits = new Map<number, ListTraits>();
+    for (const list of MediaListCollection.lists) {
+      for (const entry of list.entries) traits.set(entry.mediaId, entry.media);
+    }
+    return traits;
+  });
 }

@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Ruruka.Desktop.Bridge;
+using Ruruka.Desktop.Windowing;
 
 namespace Ruruka.Desktop.Player;
 
@@ -46,18 +47,27 @@ internal sealed class MpvSession
     // The UI turns progress into AniList profile updates, so a coarse pace is enough.
     internal static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(15);
 
-    // A friend corrects against each point, so this is also how long a small drift can last.
-    internal static readonly TimeSpan SyncInterval = TimeSpan.FromSeconds(5);
+    // A friend corrects against each point, so this is also how long a small drift can last: short enough that it is
+    // never seen, long enough that a session of many friends stays light.
+    internal static readonly TimeSpan SyncInterval = TimeSpan.FromSeconds(2);
 
     // mpv pauses by itself on the last frame of a kept-open file; that isn't someone's decision.
     private const double EpisodeEndMarginSeconds = 2;
 
     private const int DurationRequestId = 1;
     private const int PositionRequestId = 2;
+    private const int FirstFreeRequestId = 100;
+
+    // A screenshot of a 4K frame is the slowest thing asked of mpv.
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
+
+    // The script of the bundled player sends this message when the person presses its capture button.
+    private const string CaptureMessage = "ruruka-capture";
 
     private readonly IBridgeEvents _events;
     private readonly IPlaybackListener? _listener;
     private readonly Process _process;
+    private readonly Dictionary<int, TaskCompletionSource<JsonElement?>> _pendingRequests = [];
     private readonly string _pipeName = $"ruruka-mpv-{Guid.NewGuid():N}";
     private readonly Stopwatch _sinceProgress = new();
     private readonly Stopwatch _sinceSync = new();
@@ -73,6 +83,8 @@ internal sealed class MpvSession
     private bool _hasReachedEnd;
     private bool _isPaused;
     private bool _isPositionKnown;
+    private bool _isWindowIconSet;
+    private int _nextRequestId = FirstFreeRequestId;
     private double _appliedSpeed = 1;
 
     // Changes Ruruka asked for itself, so they aren't mistaken for the person's own and echoed back to the session.
@@ -88,6 +100,7 @@ internal sealed class MpvSession
 
     private MpvSession(MpvLaunch launch, PlaybackTarget target, WatchTracker tracker, IBridgeEvents events, IPlaybackListener? listener, bool isKeptOpen, IReadOnlyDictionary<string, string> options)
     {
+        Launch = launch;
         _target = target;
         _tracker = tracker;
         _events = events;
@@ -103,6 +116,20 @@ internal sealed class MpvSession
         startInfo.ArgumentList.Add("--");
         startInfo.ArgumentList.Add(target.FilePath);
         _process = new Process { StartInfo = startInfo };
+    }
+
+    /// <summary>The person pressed the capture button of the bundled player. Raised on mpv's own thread, so handlers must return at once.</summary>
+    public event Action? CaptureRequested;
+
+    public MpvLaunch Launch { get; }
+
+    /// <summary>The episode this window plays now.</summary>
+    public PlaybackTarget Target
+    {
+        get
+        {
+            lock (_gate) return _target;
+        }
     }
 
     /// <summary>
@@ -121,9 +148,75 @@ internal sealed class MpvSession
     {
         var session = new MpvSession(launch, target, tracker, events, listener, isKeptOpen, options);
         session._process.Start();
+        session.RaisePriority();
         events.Emit("player.started", new { target.MediaId, target.Episode });
         _ = session.TrackAsync();
         return session;
+    }
+
+    /// <summary>The value of an mpv property, or null when mpv has none (no subtitles, nothing loaded) or isn't reachable.</summary>
+    public async Task<JsonElement?> GetPropertyAsync(string name)
+    {
+        var reply = await RequestAsync("get_property", name);
+        return reply is { } root && root.TryGetProperty("data", out var data) ? data : null;
+    }
+
+    /// <summary>Runs an mpv command and tells whether it succeeded.</summary>
+    public async Task<bool> RunAsync(params object[] command) => await RequestAsync(command) is not null;
+
+    /// <summary>Sends a command and waits for its own reply; null when it failed, timed out or mpv is gone.</summary>
+    private async Task<JsonElement?> RequestAsync(params object[] command)
+    {
+        var completion = new TaskCompletionSource<JsonElement?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int requestId;
+        lock (_gate)
+        {
+            if (_hasExited || _writer is null) return null;
+            requestId = _nextRequestId++;
+            _pendingRequests[requestId] = completion;
+        }
+
+        try
+        {
+            if (!await TrySendMessageAsync(new { command, request_id = requestId })) return null;
+            return await completion.Task.WaitAsync(RequestTimeout);
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        finally
+        {
+            lock (_gate) _pendingRequests.Remove(requestId);
+        }
+    }
+
+    // <-- Le lecteur est lancé par Ruruka, mais la fenêtre de l'interface, derrière, ne doit pas lui prendre du temps de processeur -->
+    private void RaisePriority()
+    {
+        try
+        {
+            _process.PriorityClass = ProcessPriorityClass.AboveNormal;
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Debug.WriteLine($"[mpv] priority not raised: {error.Message}");
+        }
+    }
+
+    // <-- La barre des tâches montre l'icône de la fenêtre : celle de Ruruka remplace celle de mpv, sauf pour le mpv personnel de l'utilisateur -->
+    private async Task ApplyWindowIconAsync()
+    {
+        const int attempts = 5;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            if (await GetPropertyAsync("window-id") is { ValueKind: JsonValueKind.Number } windowId)
+            {
+                WindowIcon.Apply((nint)windowId.GetInt64());
+                return;
+            }
+            await Task.Delay(300);
+        }
     }
 
     /// <summary>Plays another episode in this mpv window; false when mpv is gone or its pipe isn't connected yet.</summary>
@@ -255,6 +348,7 @@ internal sealed class MpvSession
             lock (_gate)
             {
                 _hasExited = true;
+                foreach (var pending in _pendingRequests.Values) pending.TrySetResult(null);
                 _events.Emit("player.closed", new { _target.MediaId, _target.Episode, _tracker.WatchedRatio });
                 _listener?.OnPlaybackClosed(_target);
             }
@@ -335,6 +429,9 @@ internal sealed class MpvSession
                 case "file-loaded":
                     HandleFileLoaded();
                     break;
+                case "client-message":
+                    HandleClientMessage(root);
+                    break;
                 case "property-change" when _pendingLoads == 0:
                     HandlePropertyChange(root);
                     break;
@@ -348,8 +445,20 @@ internal sealed class MpvSession
         }
     }
 
+    private void HandleClientMessage(JsonElement root)
+    {
+        if (!root.TryGetProperty("args", out var args) || args.ValueKind != JsonValueKind.Array || args.GetArrayLength() == 0) return;
+        if (args[0].GetString() == CaptureMessage) CaptureRequested?.Invoke();
+    }
+
     private void HandleReply(int requestId, JsonElement root)
     {
+        if (_pendingRequests.TryGetValue(requestId, out var completion))
+        {
+            var isSuccess = root.TryGetProperty("error", out var error) && error.GetString() == "success";
+            completion.TrySetResult(isSuccess ? root.Clone() : null);
+            return;
+        }
         if (_pendingLoads > 0 || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Number) return;
         if (requestId == DurationRequestId) SetDuration(data.GetDouble());
         if (requestId == PositionRequestId) ReportPositionAfterSeek(data.GetDouble());
@@ -368,6 +477,11 @@ internal sealed class MpvSession
     // mpv only reports a property when its value changes, so two episodes of the same length would leave the duration unknown.
     private void HandleFileLoaded()
     {
+        if (!_isWindowIconSet && Launch.IsBundled)
+        {
+            _isWindowIconSet = true;
+            _ = ApplyWindowIconAsync();
+        }
         if (_pendingLoads == 0) return;
         _pendingLoads--;
         if (_pendingLoads == 0) _ = TrySendMessageAsync(new { command = new object[] { "get_property", "duration" }, request_id = DurationRequestId });

@@ -7,6 +7,7 @@ import { liveAbout } from './liveAbout.svelte';
 import { mediaList } from './mediaList.svelte';
 import { playback } from './playback.svelte';
 import { session } from './session.svelte';
+import { SyncClock } from '../lib/syncClock';
 import { toasts } from './toasts.svelte';
 
 const stateChannel = 'state';
@@ -14,10 +15,12 @@ const friendsChannel = 'friends';
 const syncChannel = 'sync';
 const signalChannel = 'signal';
 const controlChannel = 'control';
+const clockChannel = 'clock';
+/** Round trips to the host at the start, to measure the gap between the two clocks. */
+const clockProbeCount = 5;
+const clockProbeGapMs = 250;
 /** The host's older points are still on their way when a friend acts: following them would undo the action for a moment. */
 const controlGraceMs = 1_500;
-/** A message older than this has stalled somewhere: it says nothing reliable about the delay. */
-const maxSyncLagSeconds = 3;
 const reconnectDelaysMs = [2_000, 5_000, 15_000, 30_000, 60_000];
 
 export const hostPeerId = 'host';
@@ -49,8 +52,10 @@ export interface StreamSignal {
 type SyncPoint = BridgeEvents['player.sync'];
 
 interface SyncMessage extends SyncPoint {
-  /** The host's clock: the delay it reveals is rough, hence the cap. */
+  /** The host's clock when the message left: only its variations tell the delay, the two clocks never match. */
   sentAt: number;
+  /** How long before it left the host's player reported this position; 0 from older versions. */
+  ageSeconds: number;
 }
 
 /** A friend's pause or seek, sent to the host. */
@@ -90,9 +95,18 @@ interface HostState {
 }
 
 interface FriendNotice {
-  type: 'join' | 'leave' | 'syncRequest';
+  type: 'join' | 'leave' | 'syncRequest' | 'ping';
   friendId: string;
   name: string;
+  /** Pings only: this PC's clock when the probe left. */
+  sentAt?: number;
+}
+
+/** The host's answer to a ping: its own clock, read as the ping arrived. */
+interface ClockReply {
+  friendId: string;
+  sentAt: number;
+  hostTime: number;
 }
 
 export interface Friend {
@@ -160,7 +174,7 @@ function asSyncMessage(value: unknown): SyncMessage | null {
   const { mediaId, episode, positionSeconds, durationSeconds, isPaused, sentAt } = value;
   if (typeof mediaId !== 'number' || typeof episode !== 'number' || typeof positionSeconds !== 'number') return null;
   if (typeof durationSeconds !== 'number' || typeof isPaused !== 'boolean' || typeof sentAt !== 'number') return null;
-  return { mediaId, episode, positionSeconds, durationSeconds, isPaused, sentAt };
+  return { mediaId, episode, positionSeconds, durationSeconds, isPaused, sentAt, ageSeconds: typeof value.ageSeconds === 'number' ? value.ageSeconds : 0 };
 }
 
 function asStreamSignal(value: unknown): StreamSignal | null {
@@ -173,9 +187,16 @@ function asStreamSignal(value: unknown): StreamSignal | null {
 
 function asFriendNotice(value: unknown): FriendNotice | null {
   if (!isRecord(value)) return null;
-  const { type, friendId, name } = value;
-  if ((type !== 'join' && type !== 'leave' && type !== 'syncRequest') || typeof friendId !== 'string' || typeof name !== 'string') return null;
-  return { type, friendId, name };
+  const { type, friendId, name, sentAt } = value;
+  if ((type !== 'join' && type !== 'leave' && type !== 'syncRequest' && type !== 'ping') || typeof friendId !== 'string' || typeof name !== 'string') return null;
+  return { type, friendId, name, sentAt: typeof sentAt === 'number' ? sentAt : undefined };
+}
+
+function asClockReply(value: unknown): ClockReply | null {
+  if (!isRecord(value)) return null;
+  const { friendId, sentAt, hostTime } = value;
+  if (typeof friendId !== 'string' || typeof sentAt !== 'number' || typeof hostTime !== 'number') return null;
+  return { friendId, sentAt, hostTime };
 }
 
 /**
@@ -205,6 +226,9 @@ class GroupWatch {
   /** Host side: the stream's file, which changes with each episode. */
   streamedFile: StreamedFile | null = null;
   private lastSyncPoint: SyncPoint | null = null;
+  private lastSyncPointTakenAt = 0;
+  private isCalibrating = false;
+  private readonly syncClock = new SyncClock();
   private ignoreHostUntil = 0;
   private streamHooks: StreamHooks | null = null;
   private room: RelayRoom | null = null;
@@ -302,6 +326,29 @@ class GroupWatch {
   /** Friend side: this PC now plays the host's episode, so it asks where the host is. */
   startFollowing(kind: FollowKind): void {
     this.following = kind;
+    this.requestHostPosition();
+    void this.calibrateClock();
+  }
+
+  // <-- Quelques allers-retours avec l'hôte donnent l'écart entre nos deux horloges : c'est lui qui rend le retard des points de synchro exact -->
+  private async calibrateClock(): Promise<void> {
+    if (this.role !== 'joined' || this.isCalibrating) return;
+    this.isCalibrating = true;
+    this.syncClock.startCalibration();
+    try {
+      for (let probe = 0; probe < clockProbeCount && this.role === 'joined'; probe++) {
+        await this.room?.publish(friendsChannel, { ...this.notice('ping'), sentAt: Date.now() }, false);
+        await new Promise((resolve) => setTimeout(resolve, clockProbeGapMs));
+      }
+    } catch (error) {
+      toasts.error(error, 'Impossible de mesurer le décalage avec l’hôte');
+    } finally {
+      this.isCalibrating = false;
+    }
+  }
+
+  // <-- L'hôte répond aussitôt avec sa position : c'est ce qui recale un ami après un saut de sa part -->
+  private requestHostPosition(): void {
     void this.room?.publish(friendsChannel, this.notice('syncRequest'), false);
   }
 
@@ -345,7 +392,7 @@ class GroupWatch {
     try {
       this.room = await joinRelayRoom({
         code,
-        channels: role === 'hosting' ? [friendsChannel, signalChannel, controlChannel] : [stateChannel, syncChannel, signalChannel],
+        channels: role === 'hosting' ? [friendsChannel, signalChannel, controlChannel] : [stateChannel, syncChannel, signalChannel, clockChannel],
         lastWill:
           role === 'hosting'
             ? { channel: stateChannel, payload: this.hostState('lost'), isRetained: true }
@@ -358,7 +405,10 @@ class GroupWatch {
       this.reconnectAttempt = 0;
       this.isReconnecting = false;
       if (role === 'hosting') await this.publishHostState();
-      else await this.room.publish(friendsChannel, this.notice('join'), false);
+      else {
+        await this.room.publish(friendsChannel, this.notice('join'), false);
+        void this.calibrateClock();
+      }
       this.updateDiscordSession();
     } finally {
       this.isConnecting = false;
@@ -436,6 +486,7 @@ class GroupWatch {
     this.friends = [];
     this.remote = null;
     this.hostConnectionId = null;
+    this.syncClock.reset();
     this.mode = 'screen';
     this.streamedFile = null;
     this.syncOffsetSeconds = 0;
@@ -455,6 +506,11 @@ class GroupWatch {
       if (point) this.applySyncPoint(point);
       return;
     }
+    if (message.channel === clockChannel) {
+      const reply = asClockReply(message.payload);
+      if (reply?.friendId === this.friendId) this.syncClock.addProbe({ sentAt: reply.sentAt, hostTime: reply.hostTime, receivedAt: Date.now() });
+      return;
+    }
     if (message.channel === controlChannel) {
       const control = asControlMessage(message.payload);
       if (control) this.applyControl(control);
@@ -467,6 +523,7 @@ class GroupWatch {
   // <-- Hôte : chaque point part aux amis ; la position sert aussi de borne à ce que le flux peut envoyer -->
   private handleOwnSyncPoint(point: SyncPoint): void {
     this.lastSyncPoint = point;
+    this.lastSyncPointTakenAt = performance.now();
     if (this.shared && this.isSharing(point)) {
       this.shared = { ...this.shared, positionSeconds: point.positionSeconds, durationSeconds: point.durationSeconds };
     }
@@ -476,12 +533,19 @@ class GroupWatch {
   private publishSyncPoint(): void {
     const point = this.lastSyncPoint;
     if (this.role !== 'hosting' || this.mode === 'screen' || !this.friends.length || !point) return;
-    const message: SyncMessage = { ...point, sentAt: Date.now() };
+    // <-- Le dernier point peut dater de plusieurs secondes : l'âge part avec lui pour que les amis comptent aussi ce temps -->
+    const ageSeconds = point.isPaused ? 0 : (performance.now() - this.lastSyncPointTakenAt) / 1000;
+    const message: SyncMessage = { ...point, sentAt: Date.now(), ageSeconds };
     this.room?.publish(syncChannel, message, false).catch((error: unknown) => toasts.error(error, 'Impossible de synchroniser la séance'));
   }
 
   private sendControl({ mediaId, episode, positionSeconds, isPaused }: BridgeEvents['player.userControl']): void {
-    if (this.role !== 'joined' || this.following === 'none' || !this.canControl) return;
+    if (this.role !== 'joined' || this.following === 'none') return;
+    // <-- Sans le droit de piloter, un saut ou une pause n'engage que cet ami : l'hôte renvoie sa position et il est recalé -->
+    if (!this.canControl) {
+      this.requestHostPosition();
+      return;
+    }
     this.ignoreHostUntil = Date.now() + controlGraceMs;
     const hostPosition = positionSeconds === null ? null : Math.max(0, positionSeconds - this.syncOffsetSeconds);
     const message: ControlMessage = { friendId: this.friendId, mediaId, episode, positionSeconds: hostPosition, isPaused };
@@ -504,8 +568,7 @@ class GroupWatch {
     const current = playback.nowPlaying;
     if (this.following === 'none' || !current || current.isRemote || Date.now() < this.ignoreHostUntil) return;
     if (current.media.id !== point.mediaId || current.episode !== point.episode) return;
-    const lagSeconds = point.isPaused ? 0 : Math.min(maxSyncLagSeconds, Math.max(0, (Date.now() - point.sentAt) / 1000));
-    const positionSeconds = Math.max(0, point.positionSeconds + lagSeconds + this.syncOffsetSeconds);
+    const positionSeconds = Math.max(0, point.positionSeconds + this.syncClock.lagSeconds(point) + this.syncOffsetSeconds);
     invoke('player.followHost', { positionSeconds, isPaused: point.isPaused }).catch((error: unknown) => toasts.error(error, 'Impossible de suivre l’hôte'));
   }
 
@@ -548,6 +611,12 @@ class GroupWatch {
     if (!notice) return;
     if (notice.type === 'syncRequest') {
       this.publishSyncPoint();
+      return;
+    }
+    if (notice.type === 'ping') {
+      if (notice.sentAt === undefined) return;
+      const reply: ClockReply = { friendId: notice.friendId, sentAt: notice.sentAt, hostTime: Date.now() };
+      this.room?.publish(clockChannel, reply, false).catch((error: unknown) => toasts.error(error, 'Impossible de répondre à la mesure de l’ami'));
       return;
     }
     const others = this.friends.filter((friend) => friend.friendId !== notice.friendId);

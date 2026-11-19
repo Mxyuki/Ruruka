@@ -34,5 +34,11 @@ export function onListFor(choices: ListChoice[]): boolean | undefined {
   return choices.length === 1 ? false : undefined;
 }
 
+/** The list statuses to read from the viewer's own list, or null when media off the list are wanted too. */
+export function ownListStatuses(choices: ListChoice[]): MediaListStatus[] | null {
+  if (!choices.length || choices.includes('NONE')) return null;
+  return choices.filter((choice): choice is MediaListStatus => choice !== 'NONE');
+}
+
 /** Whether the statuses must still be checked here once AniList has applied `onListFor`. */
 export const needsStatusCheck = (choices: ListChoice[]) => choices.length > 0 && !(choices.length === 1 && choices[0] === 'NONE');

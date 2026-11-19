@@ -31,6 +31,12 @@ public sealed record AppSettings
     /// <summary>mpv stays open on the last frame of an episode, so the next one plays in the same window.</summary>
     public bool IsPlayerKeptOpen { get; init; } = true;
 
+    /// <summary>The Ruruka player shows its capture button (and answers to the C key).</summary>
+    public bool IsCaptureEnabled { get; init; } = true;
+
+    /// <summary>The capture workshop offers to cut a clip from the episode file.</summary>
+    public bool IsClipEnabled { get; init; } = true;
+
     /// <summary>Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations.</summary>
     public bool IsDiscordPresenceShown { get; init; } = true;
 
@@ -94,6 +100,8 @@ public sealed record AppSettings
         IsCloseToTray,
         IsLaunchedAtStartup,
         IsPlayerKeptOpen,
+        IsCaptureEnabled,
+        IsClipEnabled,
         IsDiscordPresenceShown,
         IsProfileVideoAutoplayed,
         IsProfileVideoSoundOn,
@@ -126,6 +134,8 @@ public sealed record PublicSettings(
     bool IsCloseToTray,
     bool IsLaunchedAtStartup,
     bool IsPlayerKeptOpen,
+    bool IsCaptureEnabled,
+    bool IsClipEnabled,
     bool IsDiscordPresenceShown,
     bool IsProfileVideoAutoplayed,
     bool IsProfileVideoSoundOn,
@@ -157,6 +167,8 @@ public sealed record SettingsPatch
     public bool? IsCloseToTray { get; init; }
     public bool? IsLaunchedAtStartup { get; init; }
     public bool? IsPlayerKeptOpen { get; init; }
+    public bool? IsCaptureEnabled { get; init; }
+    public bool? IsClipEnabled { get; init; }
     public bool? IsDiscordPresenceShown { get; init; }
     public bool? IsProfileVideoAutoplayed { get; init; }
     public bool? IsProfileVideoSoundOn { get; init; }

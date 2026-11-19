@@ -99,11 +99,13 @@
 
       <div class="facts">
         {#each facts as fact (fact.title + fact.text)}
-          {#if fact.href}
-            <a href="#{fact.href}" title={fact.title}>{fact.text}</a>
-          {:else}
-            <span title={fact.title}>{fact.text}</span>
-          {/if}
+          <span class="fact">
+            {#if fact.href}
+              <a href="#{fact.href}" title={fact.title}>{fact.text}</a>
+            {:else}
+              <span title={fact.title}>{fact.text}</span>
+            {/if}
+          </span>
         {/each}
         {#if media.nextAiringEpisode}
           <span class="airing" title="Prochain épisode">
@@ -212,6 +214,7 @@
     font-weight: 700;
   }
 
+  /* <-- Le point séparateur vit sur l'enveloppe, hors du lien : il n'est ni souligné ni cliquable --> */
   .facts > * + *::before {
     content: '·';
     margin: 0 10px;

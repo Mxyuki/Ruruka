@@ -32,6 +32,8 @@ public sealed class SettingsStore
         IsCloseToTray = patch.IsCloseToTray ?? settings.IsCloseToTray,
         IsLaunchedAtStartup = patch.IsLaunchedAtStartup ?? settings.IsLaunchedAtStartup,
         IsPlayerKeptOpen = patch.IsPlayerKeptOpen ?? settings.IsPlayerKeptOpen,
+        IsCaptureEnabled = patch.IsCaptureEnabled ?? settings.IsCaptureEnabled,
+        IsClipEnabled = patch.IsClipEnabled ?? settings.IsClipEnabled,
         IsDiscordPresenceShown = patch.IsDiscordPresenceShown ?? settings.IsDiscordPresenceShown,
         IsProfileVideoAutoplayed = patch.IsProfileVideoAutoplayed ?? settings.IsProfileVideoAutoplayed,
         IsProfileVideoSoundOn = patch.IsProfileVideoSoundOn ?? settings.IsProfileVideoSoundOn,

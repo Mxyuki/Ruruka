@@ -7,6 +7,7 @@
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
   import Section from '../../components/Section.svelte';
+  import ActivityGraph from './ActivityGraph.svelte';
   import FavouriteGrid from './FavouriteGrid.svelte';
   import { renderAniListMarkdown } from '../../lib/markdown';
   import { profileVideos } from './profileVideos';
@@ -112,6 +113,10 @@
 
     <div class="columns">
       <div>
+        <Section title="Activité">
+          <ActivityGraph userName={user.name} />
+        </Section>
+
         {#if user.statistics.anime.genres.length}
           <Section title="Genres préférés">
             <div class="genres">

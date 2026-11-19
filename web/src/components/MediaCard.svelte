@@ -11,9 +11,11 @@
     overlay?: Snippet;
     /** Writes the viewer's list status on the cover instead of only a coloured dot. */
     hasStatusLabel?: boolean;
+    /** Score shown in the sticker: given, it replaces the public average; null hides the sticker. */
+    userScore?: string | null;
   }
 
-  let { media, subtitle, overlay, hasStatusLabel = false }: Props = $props();
+  let { media, subtitle, overlay, hasStatusLabel = false, userScore }: Props = $props();
 
   const entry = $derived(mediaList.entryFor(media.id));
   // <-- Chaque carte garde toujours la même petite inclinaison, comme posée à la main -->
@@ -23,7 +25,9 @@
 <a class="media-card" href="#{mediaPath(media.id)}" title={media.title.userPreferred} style:--tilt="{tilt * 0.6}deg">
   <div class="cover" style:--coverColor={media.coverImage.color}>
     <img src={media.coverImage.large} alt="" loading="lazy" />
-    {#if media.averageScore}
+    {#if userScore !== undefined}
+      {#if userScore}<span class="score" class:is-long={userScore.length > 3} title="Ta note">{userScore}</span>{/if}
+    {:else if media.averageScore}
       <span class="score">{media.averageScore}<small>%</small></span>
     {/if}
     {#if entry}
@@ -82,18 +86,23 @@
     top: -10px;
     right: -10px;
     display: flex;
-    width: 46px;
+    min-width: 46px;
     height: 46px;
+    padding: 0 6px;
     align-items: center;
     justify-content: center;
     border: var(--outline);
-    border-radius: 50%;
+    border-radius: 23px;
     background: var(--colorStar);
     box-shadow: 2px 2px 0 var(--colorInk);
     font-family: var(--fontTitle);
     font-size: 1.2rem;
     white-space: nowrap;
     transform: rotate(8deg);
+  }
+
+  .score.is-long {
+    font-size: 0.95rem;
   }
 
   .score small {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { fetchListTraits, type ListTraits } from '../../api/queries/list';
   import { fetchGenres, fetchTagGroups, type BrowseFilters, type BrowseMedia, type MediaSort } from '../../api/queries/search';
   import type { MediaFormat, MediaSeason, MediaStatus, MediaType } from '../../api/types';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -8,8 +9,10 @@
   import MediaCard from '../../components/MediaCard.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
   import { formatEnum } from '../../lib/format';
+  import { fullRowCount, trackColumns } from '../../lib/gridColumns';
   import { navigate, replaceQuery, router, type RouteParams } from '../../lib/router.svelte';
   import { mediaList } from '../../state/mediaList.svelte';
+  import { session } from '../../state/session.svelte';
   import { toasts } from '../../state/toasts.svelte';
   import FilterCombobox from '../../components/FilterCombobox.svelte';
   import {
@@ -17,11 +20,13 @@
     excludedNames,
     needsStatusCheck,
     onListFor,
+    ownListStatuses,
     requiredNames,
     togglePick,
     updatePick,
   } from '../../lib/filterPicks';
   import ListStatusFilter from './ListStatusFilter.svelte';
+  import { browseOwnList } from './localBrowse';
   import { defaultSort, readSearchState, writeSearchState } from './searchQuery';
   import { SearchResults } from './searchResults.svelte';
   import PickedFilters from '../../components/PickedFilters.svelte';
@@ -30,6 +35,7 @@
   let { params }: { params: RouteParams } = $props();
 
   const searchDelayMs = 400;
+  const localPageSize = 30;
   const seasons: MediaSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
   const statuses: MediaStatus[] = ['RELEASING', 'FINISHED', 'NOT_YET_RELEASED', 'HIATUS', 'CANCELLED'];
   const formats: Record<MediaType, MediaFormat[]> = {
@@ -99,6 +105,39 @@
 
   const results = new SearchResults();
 
+  // <-- Un statut de ta liste se lit dans ta liste : genres, tags et popularité arrivent en un seul appel, sans parcourir les pages d'Explorer -->
+  const ownStatuses = $derived(ownListStatuses(listChoices));
+  let ownTraits = $state.raw<Map<number, ListTraits> | null>(null);
+  let localLimit = $state(localPageSize);
+  let columns = $state(1);
+
+  $effect(() => {
+    const viewerId = session.viewer?.id;
+    if (!ownStatuses || !viewerId || !mediaList.isLoaded(type)) return;
+    let isCurrent = true;
+    fetchListTraits(viewerId, type, mediaList.list(type).length)
+      .then((traits) => {
+        if (isCurrent) ownTraits = traits;
+      })
+      .catch((error) => toasts.error(error, 'Impossible de lire les détails de ta liste'));
+    return () => {
+      isCurrent = false;
+    };
+  });
+
+  const ownMedia = $derived(ownStatuses && ownTraits ? browseOwnList(mediaList.list(type), ownTraits, ownStatuses, filters) : null);
+
+  $effect(() => {
+    void filters;
+    void ownStatuses;
+    localLimit = localPageSize;
+  });
+
+  // <-- La dernière ligne reste pleine : sur un grand écran, les cartes en trop attendent le prochain chargement -->
+  const loadedMedia = $derived(ownMedia ? ownMedia.slice(0, localLimit) : (results.result?.media ?? []));
+  const canLoadMore = $derived(ownMedia ? localLimit < ownMedia.length : Boolean(results.result?.pageInfo.hasNextPage));
+  const visibleMedia = $derived(loadedMedia.slice(0, fullRowCount(loadedMedia.length, columns, canLoadMore)));
+
   $effect(() => {
     const page = results.result?.pageInfo.currentPage ?? 1;
     replaceQuery(writeSearchState({ search: debouncedSearch.trim(), genrePicks, tagPicks, year, season, format, status, sort, listChoices, page }));
@@ -111,6 +150,7 @@
   $effect(() => {
     const current = filters;
     const keepTest = keep;
+    if (ownStatuses) return;
     if (keepTest && !mediaList.isLoaded(type)) return;
     const lastPage = pageToRestore;
     pageToRestore = 1;
@@ -121,6 +161,11 @@
       scrollToRestore = 0;
     });
   });
+
+  function loadMore() {
+    if (ownStatuses) localLimit += localPageSize;
+    else void results.loadMore(filters, keep);
+  }
 
   function clearFilters() {
     search = year = '';
@@ -197,7 +242,7 @@
     </label>
     <label>
       <span class="field-label">Trier par</span>
-      <select class="select" bind:value={sort} disabled={Boolean(filters.search)}>
+      <select class="select" bind:value={sort} disabled={Boolean(filters.search) && !ownStatuses}>
         {#each sorts as [value, label] (value)}<option {value}>{label}</option>{/each}
       </select>
     </label>
@@ -213,22 +258,22 @@
     </div>
   {/if}
 
-  {#if results.isLoading && !results.result}
+  {#if ownStatuses ? !ownMedia : results.isLoading && !results.result}
     <LoadingState />
-  {:else if results.result?.media.length}
-    <div class="media-grid" class:is-stale={results.isLoading}>
-      {#each results.result.media as media (media.id)}
+  {:else if visibleMedia.length}
+    <div class="media-grid" class:is-stale={!ownStatuses && results.isLoading} use:trackColumns={(count) => (columns = count)}>
+      {#each visibleMedia as media (media.id)}
         <MediaCard {media} hasStatusLabel subtitle={[media.seasonYear, formatEnum(media.format)].filter(Boolean).join(' · ')} />
       {/each}
     </div>
-    {#if results.result.pageInfo.hasNextPage}
+    {#if canLoadMore}
       <div class="more">
-        <button class="btn" type="button" disabled={results.isLoadingMore} onclick={() => results.loadMore(filters, keep)}>
+        <button class="btn" type="button" disabled={results.isLoadingMore} onclick={loadMore}>
           {results.isLoadingMore ? 'Chargement…' : 'Voir plus'}
         </button>
       </div>
     {/if}
-  {:else if results.result}
+  {:else if ownMedia || results.result}
     <EmptyState title="Aucun suspect trouvé" message="Rien ne correspond à ces filtres.">
       <button class="btn" type="button" onclick={clearFilters}>Effacer les filtres</button>
     </EmptyState>

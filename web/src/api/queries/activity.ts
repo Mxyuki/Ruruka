@@ -1,3 +1,4 @@
+import { cached, minuteMs } from '../cache';
 import { gql } from '../client';
 import type { MediaTitle, MediaType, PageInfo, ScoreFormat } from '../types';
 
@@ -249,4 +250,21 @@ type LikeState = Pick<Social, 'likeCount' | 'isLiked'>;
 export async function toggleLike(id: number, type: LikeTarget): Promise<LikeState> {
   const { ToggleLikeV2 } = await gql<{ ToggleLikeV2: LikeState }>(toggleLikeMutation, { id, type });
   return ToggleLikeV2;
+}
+
+/** One day of a user's activity graph; `date` is the day's midnight in unix seconds. */
+export interface ActivityDay {
+  date: number;
+  amount: number;
+}
+
+/** Every day the user was active, as AniList counts them for the graph of their profile. */
+export function fetchActivityHistory(userName: string): Promise<ActivityDay[]> {
+  return cached(`activityHistory:${userName.toLowerCase()}`, 10 * minuteMs, async () => {
+    const { User } = await gql<{ User: { stats: { activityHistory: ActivityDay[] | null } } }>(
+      'query ($name: String) { User(name: $name) { stats { activityHistory { date amount } } } }',
+      { name: userName },
+    );
+    return User.stats.activityHistory ?? [];
+  });
 }

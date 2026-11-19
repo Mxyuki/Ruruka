@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { fly } from 'svelte/transition';
   import Backdrop from './components/Backdrop.svelte';
+  import CaptureDialog from './components/capture/CaptureDialog.svelte';
   import EmptyState from './components/EmptyState.svelte';
   import LoadingState from './components/LoadingState.svelte';
   import Sidebar from './components/Sidebar.svelte';
@@ -17,6 +18,7 @@
   import { installSpoilers } from './lib/spoilers';
   import SetupPage from './pages/setup/SetupPage.svelte';
   import { groupWatch } from './state/groupWatch.svelte';
+  import { capture } from './state/capture.svelte';
   import { library } from './state/library.svelte';
   import { liveAbout } from './state/liveAbout.svelte';
   import { mediaList } from './state/mediaList.svelte';
@@ -83,6 +85,7 @@
     liveAbout.init();
     groupWatch.init();
     watchStream.init();
+    capture.init();
     void session.init();
     void updates.check();
     // <-- Avant de quitter : la séance est prévenue, le profil repasse au repos, puis le host peut fermer -->
@@ -153,6 +156,11 @@
   </div>
 </div>
 
+{#if capture.offer}
+  {#key capture.offer}
+    <CaptureDialog offer={capture.offer} />
+  {/key}
+{/if}
 <UpdateDialog />
 <Toasts />
 

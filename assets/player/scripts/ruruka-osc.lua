@@ -23,6 +23,7 @@ local icons = {
     volume = 'm 3 9 l 7 9 l 12 4 l 12 20 l 7 15 l 3 15 m 15 8 l 17 8 l 17 16 l 15 16 m 19 5 l 21 5 l 21 19 l 19 19',
     muted = 'm 3 9 l 7 9 l 12 4 l 12 20 l 7 15 l 3 15 m 14 9 l 15.5 7.5 l 22 15 l 20.5 16.5 m 14 15 l 20.5 7.5 l 22 9 l 15.5 16.5',
     fullscreen = 'm 3 3 l 10 3 l 10 6 l 6 6 l 6 10 l 3 10 m 14 3 l 21 3 l 21 10 l 18 10 l 18 6 l 14 6 m 3 14 l 6 14 l 6 18 l 10 18 l 10 21 l 3 21 m 18 14 l 21 14 l 21 21 l 14 21 l 14 18 l 18 18',
+    camera = 'm 3 7 l 7 7 l 9 4 l 15 4 l 17 7 l 21 7 l 21 19 l 3 19 m 8 13 l 12 17 l 16 13 l 12 9',
     minimize = 'm 5 17 l 19 17 l 19 20 l 5 20',
     maximize = 'm 4 4 l 20 4 l 20 20 l 4 20 m 7 7 l 7 17 l 17 17 l 17 7',
     close = 'm 5 7 l 7 5 l 12 10 l 17 5 l 19 7 l 14 12 l 19 17 l 17 19 l 12 14 l 7 19 l 5 17 l 10 12',
@@ -169,6 +170,14 @@ local function labelButton(canvas, x, y, height, text, unit, onClick, isActive)
     end
     canvas.text(x + width / 2, y + height / 2, text, size, isActive and colors.ink or colors.text, 5)
     return width
+end
+
+local isCaptureEnabled = mp.get_opt('ruruka-capture') ~= 'no'
+
+-- <-- Capture : l'image se fige, puis l'application Ruruka ouvre son atelier (image ou clip) -->
+local function requestCapture()
+    mp.set_property_bool('pause', true)
+    mp.commandv('script-message', 'ruruka-capture')
 end
 
 local function seekToRatio(ratio, isFinal)
@@ -404,8 +413,12 @@ local function drawBar(canvas, width, height, unit)
     end
 
     iconButton(canvas, x1 - padding - rowHeight, rowY, rowHeight, 'fullscreen', function() mp.commandv('cycle', 'fullscreen') end)
-
     local right = x1 - padding - rowHeight - 8 * unit
+    if isCaptureEnabled then
+        local captureX = x1 - padding - 2 * rowHeight - 4 * unit
+        iconButton(canvas, captureX, rowY, rowHeight, 'camera', requestCapture)
+        right = captureX - 8 * unit
+    end
     local entries = {
         { name = 'settings', label = 'Réglages' },
         { name = 'audio', label = 'Audio' },
@@ -576,6 +589,10 @@ local function onWheel(direction)
         mp.commandv('add', 'volume', direction * 2)
     end
     render()
+end
+
+if isCaptureEnabled then
+    mp.add_key_binding('c', 'ruruka-capture-key', requestCapture)
 end
 
 mp.set_key_bindings({

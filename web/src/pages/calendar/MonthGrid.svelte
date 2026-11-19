@@ -32,7 +32,7 @@
   }
 </script>
 
-{#snippet dayChip(item: CalendarItem, isOnCover: boolean)}
+{#snippet dayChip(item: CalendarItem, isOnCover: boolean, isPast: boolean)}
   {#if item.kind === 'event'}
     <DayChip tone="event" icon="edit" label={item.event.title} {isOnCover} />
   {:else}
@@ -43,6 +43,8 @@
       mark="{item.isEstimated ? '~' : ''}{item.episode}"
       label={item.media.title.userPreferred}
       {isOnCover}
+      track={isPast && !item.isWatched ? (item.isOnDisk ? 'ready' : 'missed') : undefined}
+      isDimmed={isPast && item.isWatched}
     />
   {/if}
 {/snippet}
@@ -57,11 +59,13 @@
       {@const key = dayKey(day)}
       {@const items = itemsByDay.get(key) ?? []}
       {@const covers = dayCovers(items)}
+      {@const isPast = key < todayKey}
       <li>
         <button
           type="button"
           class="day"
           class:is-other-month={day.getMonth() !== month.getMonth()}
+          class:is-past={isPast}
           class:is-selected={key === selectedKey}
           class:has-cover={covers.length}
           aria-pressed={key === selectedKey}
@@ -76,7 +80,7 @@
           <span class="number" class:is-today={key === todayKey}>{day.getDate()}</span>
           <span class="chips">
             {#each items.slice(0, maxChipsPerDay) as item (item.id)}
-              {@render dayChip(item, covers.length > 0)}
+              {@render dayChip(item, covers.length > 0, isPast)}
             {/each}
             {#if items.length > maxChipsPerDay}
               <span class="more">+{items.length - maxChipsPerDay}</span>
@@ -94,7 +98,9 @@
   <DayChip tone="anime" isEstimated mark="~7" label="Date estimée" />
   <DayChip tone="planned" mark="1" label="Premier épisode d'un anime à voir" />
   <DayChip tone="event" icon="edit" label="Ton événement" />
-  <DayChip tone="anime" icon="check" mark="5" label="Déjà vu" />
+  <DayChip tone="anime" icon="check" mark="5" label="Déjà vu" isDimmed />
+  <DayChip tone="anime" mark="4" label="Passé, pas vu, pas de fichier" track="missed" />
+  <DayChip tone="anime" mark="4" label="Passé, pas vu, fichier prêt" track="ready" />
 </div>
 
 <style>
@@ -166,6 +172,20 @@
 
   .day:focus-visible {
     outline-offset: -3px;
+  }
+
+  /* <-- Les jours passés sont grisés ; seuls les épisodes à rattraper gardent un cerclage de couleur --> */
+  .day.is-past:not(.is-selected) {
+    background: var(--colorCollar);
+  }
+
+  .is-past .covers {
+    filter: grayscale(1);
+    opacity: 0.4;
+  }
+
+  .is-past .number {
+    color: var(--textFaint);
   }
 
   .day.is-other-month:not(.is-selected) {

@@ -11,12 +11,16 @@
     label: string;
     /** Sits on a cover: every fill stays opaque so the text remains readable. */
     isOnCover?: boolean;
+    /** Past episode not seen yet: `missed` has no file, `ready` is in a library folder. */
+    track?: 'missed' | 'ready';
+    /** Past and already seen: faded so the ones left to watch stand out. */
+    isDimmed?: boolean;
   }
 
-  let { tone, isEstimated = false, icon, mark, label, isOnCover = false }: Props = $props();
+  let { tone, isEstimated = false, icon, mark, label, isOnCover = false, track, isDimmed = false }: Props = $props();
 </script>
 
-<span class="chip-day is-{tone}" class:is-estimated={isEstimated} class:is-on-cover={isOnCover}>
+<span class="chip-day is-{tone}" class:is-estimated={isEstimated} class:is-on-cover={isOnCover} class:is-dimmed={isDimmed} data-track={track}>
   {#if icon}<Icon name={icon} size={11} />{/if}
   {#if mark}<span class="mark">{mark}</span>{/if}
   <span class="label">{label}</span>
@@ -59,6 +63,21 @@
 
   .is-on-cover.is-anime {
     background: var(--colorPaper);
+  }
+
+  /* <-- Un épisode passé et pas vu est cerclé : rouge s'il manque, vert si le fichier est déjà là --> */
+  .chip-day[data-track='missed'] {
+    border-color: var(--colorMissed);
+    box-shadow: 0 0 0 2px var(--colorMissed);
+  }
+
+  .chip-day[data-track='ready'] {
+    border-color: var(--colorReady);
+    box-shadow: 0 0 0 2px var(--colorReady);
+  }
+
+  .is-dimmed {
+    opacity: 0.55;
   }
 
   .mark {

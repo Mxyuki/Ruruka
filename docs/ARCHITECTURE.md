@@ -77,8 +77,9 @@ src/Ruruka.Desktop/          C# host
   Calendar/                  calendar.json: personal events and anime hidden from the calendar (CalendarStore)
   Discord/                   Discord activity and session invitations: activity contents (DiscordActivity), pipe protocol (DiscordIpcClient), latest-state worker (DiscordPresence)
   Player/                    mpv discovery (MpvLocator), bundled player (PlayerChoice), process + IPC (MpvSession), watched-time maths (WatchTracker), host following (SyncCorrection)
+  Capture/                   capture workshop: frames and clip request (CaptureService), clip cut with mpv's encoder (ClipEncoder)
   Streaming/                 group watch stream: shared file + local address (StreamService), mpv's HTTP side (LoopbackStreamServer), bytes to the UI (StreamResources)
-  Windowing/                 Windows 11 title-bar theming (DWM), tray icon, startup with Windows (StartupRegistration), ruruka:// links (MediaLink)
+  Windowing/                 Windows 11 title-bar theming (DWM), tray icon, Ruruka icon on the player window (WindowIcon), startup with Windows (StartupRegistration), ruruka:// links (MediaLink)
   Updates/                   GitHub release check + installer download (UpdateService)
   Manga/                     read-only gateway to the manga site API chosen in Settings (MangaSiteClient): allow-listed paths, ≤ 4 requests/s
 
@@ -127,6 +128,10 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.detect` / `player.setPath` / `player.play` | Find or pick mpv, launch an episode with tracking |
 | `player.followHost` / `player.releaseFromHost` | Keep this PC's player on the host's position, or stop |
 | `player.applyControl` | Host: apply the pause or seek of a friend allowed to control playback |
+| `capture.getFrame` | The frame the player's capture button froze, as PNG in base64 (`withSubtitles` picks the copy with the subtitles drawn). Null once the workshop closed |
+| `capture.previewClip` | A small MP4 (360p, first minute at most) of the range with the chosen crop and subtitles, as base64. Null when a newer preview replaced it |
+| `capture.saveClip` / `capture.cancelClip` | Asks where to save an MP4 or WebM (`format`; the host shows the dialog), cuts the clip from the original file, null when cancelled. Progress arrives as `capture.clipProgress` |
+| `capture.discard` | Deletes the temporary frames when the workshop closes |
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
 | `window.takeMediaLink` | The anime of a waiting `ruruka://media/{id}` link, once; null otherwise. The UI asks at startup and on `window.mediaLinkOpened` |
@@ -146,9 +151,12 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `player.started` | `{ mediaId, episode }` |
 | `player.watched` | `{ mediaId, episode }`. Fired once the episode counts as watched (see Watch tracking) |
 | `player.progress` | `{ mediaId, episode, positionSeconds, durationSeconds }`. At most every 15 s while mpv plays, plus once as soon as the duration is known |
-| `player.sync` | `{ mediaId, episode, positionSeconds, durationSeconds, isPaused }`. On pause, after a seek and every 5 s, driven by mpv's own position updates |
+| `player.sync` | `{ mediaId, episode, positionSeconds, durationSeconds, isPaused }`. On pause, after a seek and every 2 s, driven by mpv's own position updates |
 | `player.userControl` | `{ mediaId, episode, positionSeconds, isPaused }`. The person at this player paused or seeked; changes Ruruka asked for itself don't count. One value is null |
 | `stream.chunkNeeded` | `{ requestId, offset, length }`. mpv reads these bytes of a stream; the UI answers on `stream.ruruka/chunk` |
+| `capture.ready` | `{ mediaId, episode, title, positionSeconds, durationSeconds, hasSubtitles, canClip }`. The capture button of the Ruruka player was pressed and the frames are on disk |
+| `capture.failed` | `{ message }`. The frame couldn't be taken |
+| `capture.clipProgress` | `{ ratio }`. How far the clip is cut, 0 to 1 |
 | `player.ended` | `{ mediaId, episode }`. The episode reached its end (mpv's `eof-reached`); with « garder mpv ouvert », mpv stays on the last frame instead of closing |
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
 | `window.mediaLinkOpened` | `{}`. A `ruruka://` link reached the running app |
@@ -180,6 +188,32 @@ keeps the same window. The session swaps in a fresh `WatchTracker` and ignores p
 mpv reports `file-loaded`, then asks for `duration` once (mpv only notifies changed values). With
 `AppSettings.IsPlayerKeptOpen` (default on), mpv gets `--keep-open=yes`, and the UI offers the next
 episode on `player.ended` rather than waiting for `player.closed`.
+
+**Capture workshop.** The camera button of the Ruruka player (or the `c` key) pauses and sends the script message
+`ruruka-capture`, which mpv relays to IPC clients as a `client-message` event (`MpvSession.CaptureRequested`). The key
+binding has its own name, `ruruka-capture-key`: mpv also registers a binding's name as a message handler, so sharing the
+name made the button trigger itself in a loop. `CaptureService` reads the position and tracks, takes `screenshot-to-file`
+twice at the video's own resolution (`video` = no subtitles, `subtitles` = with them, only when subtitles are shown),
+keeps both in `%LOCALAPPDATA%/Ruruka/captures`, emits `capture.ready` and raises the window above the player.
+`components/capture/CaptureDialog.svelte` shows the frame under `CropFrame` (a draggable crop kept as fractions of the frame,
+`lib/cropRect.ts`). An image is cropped from the full-resolution PNG on a canvas, then copied or saved through `shell.saveImage`.
+A clip needs a local file (not a stream): `ClipEncoder` runs a second mpv with `--o` (its own libx264/AAC encoder, so no ffmpeg
+is shipped) on the original file, from `--start` to `--end`, with the same audio track and subtitles as the player (external
+subtitle files are reloaded, since that mpv runs with `--no-config`). MP4 is H.264/AAC (« Qualité max » is CRF 14); WebM is VP9/Opus (CRF 18), both already in the bundled mpv. « Léger pour Discord » aims for
+a bitrate that stays under 10 MB and shrinks frames taller than 720 px. The preview runs the same encoder at 360p, ultrafast,
+so it shows the exact cut (range, crop, subtitles) in a few seconds, and is deleted with the other temporary files. Progress comes from `--term-status-msg`. The crop
+is applied by mpv's `crop` filter, in even pixels (yuv420p), and subtitles are drawn on the cropped picture.
+
+**Explorer and the viewer's list.** When the « Ma liste » filter holds only list statuses (no « Pas dans ma liste »), `SearchPage` doesn't page through AniList: it filters the loaded list in `pages/search/localBrowse.ts`. Genres, tags and popularity aren't in a list entry, so `fetchListTraits` reads them for the whole list in one call (cached 10 minutes, keyed by the entry count). The grid reports its column count (`lib/gridColumns.ts`) and shows only full rows while more can be loaded, so the last row is never short on wide screens.
+
+**Activity graph.** `pages/profile/ActivityGraph.svelte` draws the last 365 days from `User.stats.activityHistory` (`fetchActivityHistory`), as weeks of seven days, Monday first. AniList dates each day at local midnight of an unstated timezone, so `activityGrid.ts` reads the civil date 12 hours later. Hover bubbles are CSS (`data-tip`), no script.
+
+**Player options.** Settings → Lecteur Ruruka holds `isCaptureEnabled` (the camera button and `c` key) and `isClipEnabled` (the Clip tab), both on by default.
+The capture option reaches the Lua script as `--script-opts=ruruka-capture=yes|no` when the player starts, so it applies to the next window.
+
+**Player window.** The bundled mpv gets the Ruruka icon through `WM_SETICON` once it reports `window-id` (`WindowIcon`), so the taskbar
+shows Ruruka instead of mpv, and runs above normal priority. Its `mpv.conf` reads 40 s ahead into a 300 MiB memory cache: with the
+default 1 s, a disk that stalls for a moment froze the picture.
 
 **Discord activity.** Only the bundled player reports to `DiscordPresence`, through `IPlaybackListener`, and only while `AppSettings.IsDiscordPresenceShown` is on (default on). The listener belongs to the mpv session, so an episode loaded into that window keeps it. Each `player.sync` point wakes one worker that keeps only the latest state: Discord being slow or closed never holds up tracking, and no timer runs. It skips an update when the bar's end stays within 4 s (a pause, a seek or a new speed moves it), waits 4 s after each send (Discord allows 5 per 20 s) and tries to connect at most every 30 s. The pipe stays open while the app runs, because accepted invitations arrive on it. The activity is type Watching with start and end times, which draw Discord's time bar. `status_display_type` puts the anime in the status of the member list, while the profile keeps « Ruruka » as its heading with the anime below; a pause removes them and writes the time in the text. The AniList cover is the large image and the icon from the repository its small badge. With nothing to show, the activity is cleared; turning the setting off closes the pipe, which also ends invitations in both directions.
 
@@ -278,11 +312,11 @@ can neither read nor forge session messages.
 
 **Group watch modes.** The host picks how friends watch (`HostState.mode`): `screen` (shared elsewhere, as above), `files` or `stream`.
 In the last two, `player.sync` goes out on the non-retained `sync` channel, and a friend who follows the host passes each point to
-`player.followHost`. `SyncCorrection` leaves a drift under 0.2 s alone, plays at ±5 % up to 1.5 s, and seeks past that; the host
+`player.followHost`. `SyncCorrection` leaves a drift under 0.15 s alone, plays faster or slower in proportion to the drift (up to ±6 %) until 1.2 s, and seeks past that; the host
 leads, so a friend's own pause or seek gets corrected, unless the host listed that friend in `HostState.controllerIds`. `MpvSession`
 tells the person's actions from its own corrections (`player.userControl`), so they can't echo around the session: an allowed
 friend's action goes to the host on the `control` channel, `player.applyControl` plays it there, and everyone follows the host's next
-sync point. Host points are ignored for 1.5 s after an action, while older ones are still arriving. `files` plays the friend's copy through `playback.playShared`, and
+sync point. A friend who may not control gets re-synced at once instead: their pause or seek sends a `syncRequest` and the host answers with its position. Host points are ignored for 1.5 s after an allowed action, while older ones are still arriving. A point carries `sentAt` and `ageSeconds` (how old the position was when sent): `lib/syncClock.ts` adds that age plus the trip's time. Two PCs never agree on the time, so a friend who joins (and each time they start following) sends five `ping` notices 250 ms apart; the host answers each on the `clock` channel with its own clock, and the shortest round trip gives the gap between the two clocks. A host without this (older version) never answers, and the delay is then read against the fastest recent trip. `files` plays the friend's copy through `playback.playShared`, and
 `syncOffsetSeconds` covers releases with another timing. When the file is open, the friend's own mpv does the watch tracking.
 
 **Stream.** `state/watchStream.svelte.ts` asks the host's agreement on the `signal` channel, then `api/streamPeer.ts` opens one

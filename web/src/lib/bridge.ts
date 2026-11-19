@@ -1,3 +1,5 @@
+import type { CropRect } from './cropRect';
+
 /** "system" follows the Windows app mode (light or dark); "schedule" switches at two times of day. */
 export type Theme = 'light' | 'dark' | 'system' | 'schedule';
 
@@ -21,6 +23,10 @@ export interface Settings {
   isLaunchedAtStartup: boolean;
   /** mpv stays open on the last frame of an episode, so the next one plays in the same window. */
   isPlayerKeptOpen: boolean;
+  /** The Ruruka player shows its capture button and answers to the C key. */
+  isCaptureEnabled: boolean;
+  /** The capture workshop offers to cut a clip from the episode file. */
+  isClipEnabled: boolean;
   /** Discord shows the Ruruka player's episode and the hosted session, and passes on session invitations. */
   isDiscordPresenceShown: boolean;
   /** Videos in profiles start by themselves once on screen. */
@@ -112,6 +118,43 @@ export interface SharedFile {
 }
 
 /** An anime attached to an event; `episodesPerSession` 0 attaches it without an episode goal. */
+/** What the capture workshop is offered when the player's capture button is pressed. */
+export interface CaptureOffer {
+  mediaId: number;
+  episode: number;
+  title: string;
+  positionSeconds: number;
+  durationSeconds: number;
+  /** Subtitles are on screen, so the frame exists with and without them. */
+  hasSubtitles: boolean;
+  /** The episode is a file on this PC; a stream can only be captured as an image. */
+  canClip: boolean;
+}
+
+export type ClipQuality = 'max' | 'discord';
+
+/** MP4 plays everywhere; WebM (VP9) is lighter for the same look. */
+export type ClipFormat = 'mp4' | 'webm';
+
+export interface ClipRequest {
+  startSeconds: number;
+  endSeconds: number;
+  /** Fractions of the frame; null keeps the whole picture. */
+  crop: CropRect | null;
+  withSubtitles: boolean;
+  quality: ClipQuality;
+  format: ClipFormat;
+  fileName: string;
+}
+
+/** The cut a preview shows: the range, the crop and the subtitles, nothing about the output file. */
+export type ClipPreviewRequest = Pick<ClipRequest, 'startSeconds' | 'endSeconds' | 'crop' | 'withSubtitles'>;
+
+export interface ClipSaved {
+  path: string;
+  folder: string;
+}
+
 export interface CalendarEventAnime {
   mediaId: number;
   title: string;
@@ -171,6 +214,15 @@ interface BridgeApi {
   'player.releaseFromHost': [void, boolean];
   /** Host side: applies the pause or seek of a friend allowed to control playback. */
   'player.applyControl': [{ positionSeconds: number | null; isPaused: boolean | null }, boolean];
+  /** The frame taken by the capture button as PNG in base64; null once the workshop closed. */
+  'capture.getFrame': [{ withSubtitles: boolean }, string | null];
+  /** Asks where to save, then cuts the clip from the original file; null when the user cancelled. */
+  'capture.saveClip': [ClipRequest, ClipSaved | null];
+  /** A small MP4 of the range in base64 (its first minute at most); null when a newer preview replaced it. */
+  'capture.previewClip': [ClipPreviewRequest, string | null];
+  'capture.cancelClip': [void, boolean];
+  /** Deletes the workshop's temporary frames. */
+  'capture.discard': [void, boolean];
   /** Host side: shares the file its player opened; a friend can never name a path. */
   'stream.share': [void, SharedFile];
   'stream.stopSharing': [void, boolean];
@@ -218,6 +270,10 @@ export interface BridgeEvents {
   /** The episode reached its end; with isPlayerKeptOpen, mpv stays open on the last frame. */
   'player.ended': { mediaId: number; episode: number };
   'player.closed': { mediaId: number; episode: number; watchedRatio: number };
+  /** The capture button of the Ruruka player was pressed: the frame is ready for `capture.getFrame`. */
+  'capture.ready': CaptureOffer;
+  'capture.failed': { message: string };
+  'capture.clipProgress': { ratio: number };
   /** The app is really quitting (not hiding to the tray); answer with "window.readyToQuit" within 5 s. */
   'window.closing': Record<string, never>;
   /** A ruruka:// link reached the running app: collect it with "window.takeMediaLink". */

@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using Microsoft.Web.WebView2.WinForms;
 using Ruruka.Desktop.Bridge;
 using Ruruka.Desktop.Bridge.Modules;
+using Ruruka.Desktop.Capture;
 using Ruruka.Desktop.Calendar;
 using Ruruka.Desktop.Discord;
 using Ruruka.Desktop.Library;
@@ -78,6 +79,14 @@ internal sealed class MainForm : Form
         Show();
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
+    }
+
+    /// <summary>Brings the window above the player, which has the focus when the capture button is pressed.</summary>
+    public void ShowOverPlayer()
+    {
+        ShowFromTray();
+        TopMost = true;
+        TopMost = false;
     }
 
     /// <summary>A second Ruruka was started: shows the window and passes on the link it may have left.</summary>
@@ -312,6 +321,8 @@ internal sealed class MainForm : Form
         _presence = new DiscordPresence(_settings, notifier, () => BeginInvoke(ShowFromTray));
         var player = new PlayerService(_settings, notifier, _presence);
         var stream = new StreamService(player, events);
+        var capture = new CaptureService(player, events, () => BeginInvoke(ShowOverPlayer));
+        capture.Attach();
         new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
         IBridgeModule[] modules =
         [
@@ -320,6 +331,7 @@ internal sealed class MainForm : Form
             new LibraryModule(_settings, _links),
             new CalendarModule(_calendar),
             new PlayerModule(player),
+            new CaptureModule(capture, this),
             new StreamModule(stream),
             new DiscordModule(_presence),
             new ShellModule(this),

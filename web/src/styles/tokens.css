@@ -25,6 +25,12 @@
   --colorSuccess: #2f8a5b;
   --colorWarning: #a8650f;
   --colorDanger: #b8322b;
+  --colorActivity1: var(--colorMauve);
+  --colorActivity2: var(--colorLilac);
+  --colorActivity3: #7b5a98;
+  --colorActivity4: var(--colorPlum);
+  --colorMissed: var(--colorThread);
+  --colorReady: var(--colorSuccess);
 
   /* <-- Traits et ombres d'autocollant --> */
   --colorLine: rgb(43 30 48 / 0.12);
@@ -123,6 +129,10 @@
     --colorSuccess: #5fc792;
     --colorWarning: #e6a552;
     --colorDanger: #f0706a;
+    --colorActivity1: #45324f;
+    --colorActivity2: #6e4a72;
+    --colorActivity3: #8a6cab;
+    --colorActivity4: #c9a7e6;
 
     --colorLine: rgb(242 233 245 / 0.1);
     --colorLineStrong: rgb(242 233 245 / 0.24);

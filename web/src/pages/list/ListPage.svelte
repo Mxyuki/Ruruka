@@ -7,7 +7,7 @@
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
-  import { formatListStatus, formatProgress, statusColor } from '../../lib/format';
+  import { formatListStatus, formatProgress, formatUserScore, statusColor } from '../../lib/format';
   import type { RouteParams } from '../../lib/router.svelte';
   import { userPath } from '../../lib/routes';
   import { normalizeForMatch } from '../../lib/titleMatch';
@@ -160,7 +160,7 @@
       {:else}
         <div class="media-grid">
           {#each group.entries as entry (entry.id)}
-            <MediaCard media={entry.media}>
+            <MediaCard media={entry.media} userScore={entry.score ? formatUserScore(entry.score, session.scoreFormat) : null}>
               {#snippet overlay()}{formatProgress(entry.progress, totalUnits(entry.media), entry.media)}{/snippet}
             </MediaCard>
           {/each}

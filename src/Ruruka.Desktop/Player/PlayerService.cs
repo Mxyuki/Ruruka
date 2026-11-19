@@ -21,6 +21,9 @@ public sealed class PlayerService(SettingsStore settings, IBridgeEvents events, 
 
     private MpvSession? _session;
 
+    /// <summary>The capture button of the bundled player was pressed. Raised on mpv's own thread, so handlers must return at once.</summary>
+    internal event Action<MpvSession>? CaptureRequested;
+
     /// <summary>The local file last opened in the player; null during a stream.</summary>
     public string? CurrentFilePath { get; private set; }
 
@@ -68,8 +71,14 @@ public sealed class PlayerService(SettingsStore settings, IBridgeEvents events, 
         // <-- Une fenêtre mpv déjà ouverte reçoit le nouvel épisode : un partage d'écran Discord continue sans coupure -->
         if (_session is { } open && await open.TryLoadAsync(target, tracker, options)) return;
         var listener = launch.IsBundled ? bundledPlayerListener : null;
-        _session = MpvSession.Start(launch, target, tracker, events, listener, current.IsPlayerKeptOpen, options);
+        var session = MpvSession.Start(launch, target, tracker, events, listener, current.IsPlayerKeptOpen, launch.IsBundled ? WithInterfaceOptions(options, current) : options);
+        session.CaptureRequested += () => CaptureRequested?.Invoke(session);
+        _session = session;
     }
+
+    // <-- Le script du lecteur Ruruka lit ces options au lancement : un changement de réglage vaut pour la prochaine fenêtre -->
+    private static Dictionary<string, string> WithInterfaceOptions(IReadOnlyDictionary<string, string> options, AppSettings current) =>
+        new(options) { ["script-opts"] = $"ruruka-capture={(current.IsCaptureEnabled ? "yes" : "no")}" };
 
     // <-- Un choix impossible à honorer retombe sur l'autre lecteur plutôt que de bloquer l'épisode -->
     private MpvLaunch ChooseLaunch()
