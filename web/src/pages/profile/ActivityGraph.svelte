@@ -12,10 +12,10 @@
 </script>
 
 {#await grid}
-  <p class="faint status" role="status">On relève les traces de l’année…</p>
+  <p class="faint status" role="status">On relève les traces des six derniers mois…</p>
 {:then { weeks, monthLabels, total, activeDays }}
   {#if total}
-    <!-- Les carrés de l'année, une colonne par semaine -->
+    <!-- Les carrés des six derniers mois, une colonne par semaine -->
     <div class="card graph">
       <div class="board" style:--weeks={weeks.length}>
         <span></span>
@@ -25,7 +25,7 @@
         <div class="weekdays" aria-hidden="true">
           {#each weekdayLabels as label, index (index)}<span>{label}</span>{/each}
         </div>
-        <div class="cells" role="img" aria-label="{pluralize(total, 'activité')} sur l’année, réparties sur {pluralize(activeDays, 'jour')}">
+        <div class="cells" role="img" aria-label="{pluralize(total, 'activité')} sur six mois, réparties sur {pluralize(activeDays, 'jour')}">
           {#each weeks as week, weekIndex (weekIndex)}
             {#each week as cell, dayIndex (dayIndex)}
               {#if cell}
@@ -45,7 +45,7 @@
       </div>
 
       <div class="foot">
-        <span>{pluralize(total, 'activité')} sur l’année · {pluralize(activeDays, 'jour')} d’enquête</span>
+        <span>{pluralize(total, 'activité')} sur six mois · {pluralize(activeDays, 'jour')} d’enquête</span>
         <span class="legend" aria-hidden="true">
           Moins
           {#each levels as level (level)}<span class="cell level-{level}"></span>{/each}
@@ -54,7 +54,7 @@
       </div>
     </div>
   {:else}
-    <p class="faint status">Pas encore de trace d’activité sur l’année.</p>
+    <p class="faint status">Pas encore de trace d’activité sur six mois.</p>
   {/if}
 {:catch}
   <p class="faint status">Impossible de lire l’activité de cette personne pour l’instant.</p>

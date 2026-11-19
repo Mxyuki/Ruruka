@@ -6,6 +6,12 @@ export async function pngFromBase64(base64: string): Promise<Blob> {
   return response.blob();
 }
 
+/** A JPEG picture made by the host, in base64, as a blob the page can show. */
+export async function jpegFromBase64(base64: string): Promise<Blob> {
+  const response = await fetch(`data:image/jpeg;base64,${base64}`);
+  return response.blob();
+}
+
 /** The preview clip made by the host, in base64, as a blob a <video> can play. */
 export async function mp4FromBase64(base64: string): Promise<Blob> {
   const response = await fetch(`data:video/mp4;base64,${base64}`);

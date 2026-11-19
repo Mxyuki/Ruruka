@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Ruruka.Desktop.Capture;
 using Ruruka.Desktop.Settings;
 using Ruruka.Desktop.Windowing;
 
@@ -13,6 +14,8 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
     // mpv rarely reports the very last frame, so 100 % would never be reached.
     private const int MaxWatchPercent = 95;
     private const int MaxCompareCacheMinutes = 120;
+    private const int MaxClipPresets = 30;
+    private const int MaxScreenNameLength = 64;
 
     public void Register(BridgeRouter router)
     {
@@ -87,9 +90,37 @@ internal sealed partial class SettingsModule(SettingsStore settings, Action onCh
         {
             throw new BridgeException("Heure du thème invalide.");
         }
+        if (patch.ClipEngine is not (null or "mpv" or "ffmpeg"))
+        {
+            throw new BridgeException("Moteur de clips inconnu.");
+        }
+        if (patch.ClipEngine == "ffmpeg" && !FfmpegService.IsInstalled)
+        {
+            throw new BridgeException("ffmpeg n'est pas encore téléchargé : télécharge-le d'abord.");
+        }
+        if (patch.PlayerScreenMode is { } screenMode && !Player.PlayerWindowOptions.IsKnownMode(screenMode))
+        {
+            throw new BridgeException("Choix d'écran du lecteur inconnu.");
+        }
+        if (patch.PlayerScreenName is { Length: > MaxScreenNameLength })
+        {
+            throw new BridgeException("Nom d'écran invalide.");
+        }
+        ValidateClipPresets(patch.ClipPresets);
         if (!IsSiteText(patch.SearchSiteUrl) || !IsSiteText(patch.MangaSiteUrl) || !IsSiteText(patch.SongFileHostUrl))
         {
             throw new BridgeException("Adresse de site invalide.");
+        }
+    }
+
+    private static void ValidateClipPresets(IReadOnlyList<ClipPreset>? presets)
+    {
+        if (presets is null) return;
+        if (presets.Count > MaxClipPresets) throw new BridgeException($"Tu peux garder {MaxClipPresets} réglages de clip au plus.");
+        if (presets.Select(preset => preset.Id).Distinct().Count() != presets.Count) throw new BridgeException("Deux réglages de clip ont le même identifiant.");
+        foreach (var preset in presets)
+        {
+            if (ClipPresetCatalog.Problem(preset) is { } problem) throw new BridgeException(problem);
         }
     }
 

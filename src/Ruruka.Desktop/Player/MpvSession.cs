@@ -8,7 +8,8 @@ using Ruruka.Desktop.Windowing;
 namespace Ruruka.Desktop.Player;
 
 /// <param name="CoverUrl">AniList cover shown on Discord; null keeps the Ruruka icon.</param>
-public sealed record PlaybackTarget(int MediaId, int Episode, string FilePath, string Title, string? CoverUrl = null);
+/// <param name="Navigation">What the bar offers around this episode; null offers nothing (streams, shared files).</param>
+public sealed record PlaybackTarget(int MediaId, int Episode, string FilePath, string Title, string? CoverUrl = null, EpisodeNavigation? Navigation = null);
 
 /// <summary>Payload of "player.watched": the episode crossed the watched threshold.</summary>
 public sealed record EpisodeWatched(int MediaId, int Episode, string Title);
@@ -64,6 +65,9 @@ internal sealed class MpvSession
     // The script of the bundled player sends this message when the person presses its capture button.
     private const string CaptureMessage = "ruruka-capture";
 
+    // ...and this one when the person asks for the previous or next episode, with "previous" or "next" as its argument.
+    private const string EpisodeMessage = "ruruka-episode";
+
     private readonly IBridgeEvents _events;
     private readonly IPlaybackListener? _listener;
     private readonly Process _process;
@@ -84,6 +88,7 @@ internal sealed class MpvSession
     private bool _isPaused;
     private bool _isPositionKnown;
     private bool _isWindowIconSet;
+    private nint _windowHandle;
     private int _nextRequestId = FirstFreeRequestId;
     private double _appliedSpeed = 1;
 
@@ -121,7 +126,16 @@ internal sealed class MpvSession
     /// <summary>The person pressed the capture button of the bundled player. Raised on mpv's own thread, so handlers must return at once.</summary>
     public event Action? CaptureRequested;
 
+    /// <summary>The mpv process ended; raised on mpv's own thread after the last "player.closed".</summary>
+    public event Action? Closed;
+
     public MpvLaunch Launch { get; }
+
+    /// <summary>Where the window was last seen, refreshed with each sync point; null until the window was seen in a usable state.</summary>
+    public PlayerWindowPlacement? LastPlacement { get; private set; }
+
+    /// <summary>The monitors, so a full-screen window isn't taken for a place to come back to.</summary>
+    internal Func<IReadOnlyList<Rectangle>>? MonitorBounds { get; set; }
 
     /// <summary>The episode this window plays now.</summary>
     public PlaybackTarget Target
@@ -212,7 +226,8 @@ internal sealed class MpvSession
         {
             if (await GetPropertyAsync("window-id") is { ValueKind: JsonValueKind.Number } windowId)
             {
-                WindowIcon.Apply((nint)windowId.GetInt64());
+                _windowHandle = (nint)windowId.GetInt64();
+                WindowIcon.Apply(_windowHandle);
                 return;
             }
             await Task.Delay(300);
@@ -352,6 +367,7 @@ internal sealed class MpvSession
                 _events.Emit("player.closed", new { _target.MediaId, _target.Episode, _tracker.WatchedRatio });
                 _listener?.OnPlaybackClosed(_target);
             }
+            Closed?.Invoke();
             _process.Dispose();
         }
     }
@@ -448,7 +464,12 @@ internal sealed class MpvSession
     private void HandleClientMessage(JsonElement root)
     {
         if (!root.TryGetProperty("args", out var args) || args.ValueKind != JsonValueKind.Array || args.GetArrayLength() == 0) return;
-        if (args[0].GetString() == CaptureMessage) CaptureRequested?.Invoke();
+        var message = args[0].GetString();
+        if (message == CaptureMessage) CaptureRequested?.Invoke();
+        if (message == EpisodeMessage && args.GetArrayLength() > 1 && args[1].GetString() is "previous" or "next")
+        {
+            _events.Emit("player.episodeRequested", new { _target.MediaId, _target.Episode, Direction = args[1].GetString() });
+        }
     }
 
     private void HandleReply(int requestId, JsonElement root)
@@ -545,6 +566,14 @@ internal sealed class MpvSession
         var point = new PlaybackSyncPoint(_target.MediaId, _target.Episode, _lastPosition, _tracker.DurationSeconds, _isPaused);
         _events.Emit("player.sync", point);
         _listener?.OnPlaybackChanged(_target, point);
+        RememberWindowPlace();
+    }
+
+    // <-- Pas de minuterie pour ça : la place est relevée à chaque point de synchro, ce qui suffit à la retrouver à la fermeture -->
+    private void RememberWindowPlace()
+    {
+        if (_windowHandle == 0 || MonitorBounds is not { } monitors) return;
+        if (WindowGeometry.Read(_windowHandle, monitors()) is { } placement) LastPlacement = placement;
     }
 
     // With keep-open, mpv stays on the last frame, so the end of the episode is reported here rather than by "player.closed".

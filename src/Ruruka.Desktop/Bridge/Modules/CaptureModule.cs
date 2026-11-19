@@ -7,8 +7,9 @@ internal sealed class CaptureModule(CaptureService capture, Form owner) : IBridg
     public void Register(BridgeRouter router)
     {
         router.Register<FrameParams, string?>("capture.getFrame", parameters => capture.ReadFrameAsync(parameters.WithSubtitles));
+        router.Register<FrameAtParams, string?>("capture.getFrameAt", parameters => capture.ReadFrameAtAsync(parameters.Seconds, parameters.WithSubtitles));
         router.Register<ClipPreviewRequest, string?>("capture.previewClip", preview => capture.PreviewClipAsync(preview));
-        router.Register<ClipRequest, ClipSaved?>("capture.saveClip", request => capture.SaveClipAsync(request, fileName => PickClipPath(fileName, request.Format)));
+        router.Register<ClipRequest, ClipSaved?>("capture.saveClip", request => capture.SaveClipAsync(request, PickClipPath));
         router.Register("capture.cancelClip", () =>
         {
             capture.CancelClip();
@@ -21,15 +22,14 @@ internal sealed class CaptureModule(CaptureService capture, Form owner) : IBridg
         });
     }
 
-    private string? PickClipPath(string fileName, string format)
+    private string? PickClipPath(string fileName, string extension)
     {
         var safeName = string.Concat(fileName.Split(Path.GetInvalidFileNameChars())).Trim();
-        var isWebm = format == ClipEncoder.FormatWebm;
         using var dialog = new SaveFileDialog
         {
             Title = "Enregistrer le clip",
-            Filter = isWebm ? "Vidéo WebM|*.webm" : "Vidéo MP4|*.mp4",
-            DefaultExt = isWebm ? "webm" : "mp4",
+            Filter = $"Vidéo {extension.ToUpperInvariant()}|*.{extension}",
+            DefaultExt = extension,
             AddExtension = true,
             FileName = safeName.Length > 0 ? safeName : "ruruka",
         };
@@ -37,4 +37,6 @@ internal sealed class CaptureModule(CaptureService capture, Form owner) : IBridg
     }
 
     private sealed record FrameParams(bool WithSubtitles);
+
+    private sealed record FrameAtParams(double Seconds, bool WithSubtitles);
 }

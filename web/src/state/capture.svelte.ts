@@ -26,6 +26,11 @@ class Capture {
     return invoke('capture.getFrame', { withSubtitles });
   }
 
+  /** The picture at a second as JPEG in base64; null when a newer request replaced it. */
+  loadFrameAt(seconds: number, withSubtitles: boolean): Promise<string | null> {
+    return invoke('capture.getFrameAt', { seconds, withSubtitles });
+  }
+
   /** A small MP4 of the range, taken from the original file, as base64. */
   loadPreview(request: ClipPreviewRequest): Promise<string | null> {
     return invoke('capture.previewClip', request);

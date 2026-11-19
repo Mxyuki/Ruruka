@@ -57,8 +57,16 @@ english.WelcomeLabel2=Ruruka will be installed on your computer: your AniList li
 english.FinishedHeadingLabel=Case solved!
 english.FinishedLabel=Ruruka is installed. You'll find it on your desktop and in the Start menu.
 
+[CustomMessages]
+french.FfmpegGroup=Clips
+french.FfmpegTask=Activer les clips avancés avec ffmpeg (environ 40 Mo, téléchargés au premier lancement)
+english.FfmpegGroup=Clips
+english.FfmpegTask=Enable advanced clips with ffmpeg (about 40 MB, downloaded on first launch)
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+; <-- Facultatif et décoché : sans ffmpeg, les clips passent par l'encodeur de mpv -->
+Name: "ffmpeg"; Description: "{cm:FfmpegTask}"; GroupDescription: "{cm:FfmpegGroup}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -77,3 +85,17 @@ Root: HKCU; Subkey: "Software\Classes\discord-1568045470675239012"; ValueType: n
 [Run]
 ; <-- Sans skipifsilent : après une mise à jour silencieuse lancée par l'app, Ruruka se relance tout seul -->
 Filename: "{app}\Ruruka.exe"; Description: "{cm:LaunchProgram,Ruruka}"; Flags: nowait postinstall 
+
+[Code]
+// <-- Ruruka télécharge ffmpeg lui-même (empreinte vérifiée, progression) : l'installeur laisse seulement une demande -->
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  requestFolder: String;
+begin
+  if (CurStep = ssPostInstall) and WizardIsTaskSelected('ffmpeg') then
+  begin
+    requestFolder := ExpandConstant('{localappdata}\Ruruka');
+    ForceDirectories(requestFolder);
+    SaveStringToFile(requestFolder + '\install-ffmpeg.flag', '1', False);
+  end;
+end;

@@ -42,7 +42,11 @@ son lecteur ou ton [mpv](https://mpv.io) et **coche l'épisode toute seule** qua
   l'atelier : tu recadres, tu gardes ou non les sous-titres, puis tu copies l'image ou tu l'enregistres
   en pleine résolution. L'onglet « Clip » découpe les dernières secondes (ou l'extrait de ton choix) dans
   le fichier d'origine, en qualité max ou assez léger pour Discord, en MP4 ou en WebM. Un aperçu montre l'extrait exact (cadrage et
-  sous-titres compris) avant de l'enregistrer. Les deux options se coupent dans Réglages → Lecteur Ruruka.
+  sous-titres compris) avant de l'enregistrer. Un moteur ffmpeg facultatif (case à l'installation, ou Réglages → Capture et clips) permet tes propres commandes
+  enregistrées sous un nom, avec « Qualité max » et « Léger pour Discord » comme point de départ. Les deux options se coupent dans Réglages → Capture et clips.
+- **Enchaîner les épisodes.** Dans les dernières secondes d'un épisode, le lecteur propose le suivant en un clic
+  (après le dernier d'un enchaînement), et sa barre a des flèches vers l'épisode précédent et suivant de ton dossier.
+  Le lecteur s'ouvre sur l'écran de Ruruka, sur un écran choisi, ou là où tu l'as fermé.
 - **Lecture et progression automatique.** Arrivé à 85 % de l'épisode, ta liste se met à jour. Tu peux passer les génériques tant que tu as vraiment vu la moitié de l'épisode ; les deux seuils se règlent.
   Elle ne recule jamais : si tu revois un vieil épisode, ta progression ne bouge pas.
 - **Ton épisode sur Discord.** Avec le lecteur Ruruka, ton profil montre l'anime, l'épisode et le temps

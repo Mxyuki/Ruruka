@@ -10,9 +10,55 @@
     columnGap: string;
     rowGap: string;
     cell: Snippet<[T]>;
+    /** Cells can be dragged onto each other to change their place. */
+    isReordering?: boolean;
+    /** Saves the new order (keys, first shown first); false when it couldn't be saved, and the grid goes back. */
+    onreorder?: (keys: number[]) => Promise<boolean>;
   }
 
-  let { items, keyOf, minItemWidth, columnGap, rowGap, cell }: Props = $props();
+  let { items, keyOf, minItemWidth, columnGap, rowGap, cell, isReordering = false, onreorder }: Props = $props();
+
+  // <-- L'ordre choisi vit ici jusqu'à la sortie de la page : AniList l'a déjà, mais le profil chargé ne bouge pas tout seul -->
+  let order = $state<number[] | null>(null);
+  let draggedKey = $state<number | null>(null);
+  let overKey = $state<number | null>(null);
+
+  const shown = $derived.by(() => {
+    if (!order) return items;
+    const byKey = new Map(items.map((item) => [keyOf(item), item]));
+    return order.flatMap((key) => byKey.get(key) ?? []);
+  });
+
+  function endDrag() {
+    draggedKey = null;
+    overKey = null;
+  }
+
+  // <-- Lâcher une image sur une autre lui prend sa place, les autres se décalent -->
+  async function drop(targetKey: number) {
+    const movedKey = draggedKey;
+    endDrag();
+    if (movedKey === null || movedKey === targetKey) return;
+    const keys = shown.map(keyOf);
+    const targetIndex = keys.indexOf(targetKey);
+    keys.splice(keys.indexOf(movedKey), 1);
+    keys.splice(targetIndex, 0, movedKey);
+    const previous = order;
+    order = keys;
+    if (!(await onreorder?.(keys) ?? true)) order = previous;
+  }
+
+  function startDrag(event: DragEvent, key: number) {
+    draggedKey = key;
+    event.dataTransfer?.setData('text/plain', String(key));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function hover(event: DragEvent, key: number) {
+    if (draggedKey === null) return;
+    event.preventDefault();
+    overKey = key;
+  }
 
   let frame = $state<HTMLElement>();
   let width = $state(0);
@@ -28,8 +74,22 @@
 
 <div class="frame" bind:this={frame} bind:clientWidth={width} style:--columnGap={columnGap}>
   <div class="grid" style:width="{rowWidth}px" style:--cellWidth="{cellWidth}px" style:--rowGap={rowGap}>
-    {#each items as item (keyOf(item))}
-      <div class="cell">{@render cell(item)}</div>
+    {#each shown as item (keyOf(item))}
+      {@const key = keyOf(item)}
+      <div
+        class="cell"
+        class:is-reorderable={isReordering}
+        class:is-dragged={draggedKey === key}
+        class:is-target={overKey === key && draggedKey !== key}
+        role="listitem"
+        draggable={isReordering}
+        ondragstart={(event) => startDrag(event, key)}
+        ondragover={(event) => hover(event, key)}
+        ondrop={() => drop(key)}
+        ondragend={endDrag}
+      >
+        {@render cell(item)}
+      </div>
     {/each}
   </div>
 </div>
@@ -52,6 +112,25 @@
     display: flex;
     width: var(--cellWidth);
     min-width: 0;
+  }
+
+  /* <-- En mode « réorganiser », la case entière se saisit : ses liens et images ne captent plus la souris --> */
+  .cell.is-reorderable {
+    cursor: grab;
+  }
+
+  .cell.is-reorderable > :global(*) {
+    pointer-events: none;
+  }
+
+  .cell.is-dragged {
+    opacity: 0.4;
+  }
+
+  .cell.is-target {
+    outline: 3px dashed var(--colorStrawberry);
+    outline-offset: 4px;
+    border-radius: var(--radiusSmall);
   }
 
   .cell > :global(*) {

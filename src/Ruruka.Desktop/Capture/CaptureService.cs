@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Ruruka.Desktop.Bridge;
 using Ruruka.Desktop.Player;
+using Ruruka.Desktop.Settings;
 
 namespace Ruruka.Desktop.Capture;
 
@@ -9,17 +10,19 @@ namespace Ruruka.Desktop.Capture;
 /// The capture workshop's host side. When the player's capture button is pressed it takes the frame at full
 /// resolution (with and without subtitles) and tells the UI; a clip is cut afterwards from the original file.
 /// </summary>
-internal sealed class CaptureService(PlayerService player, IBridgeEvents events, Action showWindow)
+internal sealed class CaptureService(PlayerService player, SettingsStore settings, IBridgeEvents events, Action showWindow)
 {
     private const string PlainFrameName = "frame.png";
     private const string SubtitledFrameName = "frame-subtitles.png";
     private const string PreviewName = "preview.mp4";
+    private const string ScrubFolderName = "scrub";
 
     private static string FolderPath => Path.Combine(AppPaths.LocalData, "captures");
 
     private ClipSource? _clipSource;
     private CancellationTokenSource? _clipCancellation;
     private CancellationTokenSource? _previewCancellation;
+    private CancellationTokenSource? _scrubCancellation;
 
     public void Attach() => player.CaptureRequested += session => _ = Task.Run(() => OfferAsync(session));
 
@@ -30,21 +33,27 @@ internal sealed class CaptureService(PlayerService player, IBridgeEvents events,
         return File.Exists(path) ? Convert.ToBase64String(await File.ReadAllBytesAsync(path)) : null;
     }
 
-    /// <summary>Cuts the clip into <paramref name="outputPath"/>; the UI follows it with "capture.clipProgress".</summary>
-    public async Task<ClipSaved?> SaveClipAsync(ClipRequest request, Func<string, string?> askPath)
+    /// <summary>
+    /// Cuts the clip where <paramref name="askPath"/> says (it gets the suggested name and the file extension); the UI
+    /// follows it with "capture.clipProgress". It uses ffmpeg with the chosen preset when that engine is on, else mpv.
+    /// </summary>
+    public async Task<ClipSaved?> SaveClipAsync(ClipRequest request, Func<string, string, string?> askPath)
     {
         var source = _clipSource ?? throw new BridgeException("Ce clip n'est plus disponible : relance la capture depuis le lecteur.");
         var length = request.EndSeconds - request.StartSeconds;
         if (request.StartSeconds < 0 || length <= 0) throw new BridgeException("L'extrait est vide : la fin doit venir après le début.");
         if (length > ClipEncoder.MaxClipSeconds) throw new BridgeException("Un clip dure 5 minutes au plus.");
-        if (request.Format is not (ClipEncoder.FormatMp4 or ClipEncoder.FormatWebm)) throw new BridgeException("Format de clip inconnu : choisis MP4 ou WebM.");
-        if (askPath(request.FileName) is not { } outputPath) return null;
+        var preset = IsFfmpegEngine ? ClipPresetCatalog.Find(settings.Current.ClipPresets, request.PresetId) : null;
+        if (preset is null && request.Format is not (ClipEncoder.FormatMp4 or ClipEncoder.FormatWebm)) throw new BridgeException("Format de clip inconnu : choisis MP4 ou WebM.");
+        if (askPath(request.FileName, preset?.Extension ?? request.Format) is not { } outputPath) return null;
 
-        _clipCancellation?.Cancel();
+        Cancel(_clipCancellation);
         using var cancellation = _clipCancellation = new CancellationTokenSource();
         try
         {
-            await ClipEncoder.RunAsync(source, request, outputPath, ratio => events.Emit("capture.clipProgress", new { ratio }), cancellation.Token);
+            void ReportProgress(double ratio) => events.Emit("capture.clipProgress", new { ratio });
+            if (preset is null) await ClipEncoder.RunAsync(source, request, outputPath, ReportProgress, cancellation.Token);
+            else await FfmpegClipEncoder.RunAsync(FfmpegService.ExecutablePath, source, request, preset, outputPath, ReportProgress, cancellation.Token);
             return new ClipSaved(outputPath, Path.GetDirectoryName(outputPath) ?? outputPath);
         }
         catch (OperationCanceledException)
@@ -53,7 +62,9 @@ internal sealed class CaptureService(PlayerService player, IBridgeEvents events,
         }
     }
 
-    public void CancelClip() => _clipCancellation?.Cancel();
+    private bool IsFfmpegEngine => settings.Current.ClipEngine == "ffmpeg" && FfmpegService.IsInstalled;
+
+    public void CancelClip() => Cancel(_clipCancellation);
 
     /// <summary>
     /// A small MP4 of the range (its first minute at most) with the chosen crop and subtitles, as base64; null when a newer
@@ -65,7 +76,7 @@ internal sealed class CaptureService(PlayerService player, IBridgeEvents events,
         var end = Math.Min(preview.EndSeconds, preview.StartSeconds + ClipEncoder.MaxPreviewSeconds);
         if (preview.StartSeconds < 0 || end <= preview.StartSeconds) throw new BridgeException("L'extrait est vide : la fin doit venir après le début.");
 
-        _previewCancellation?.Cancel();
+        Cancel(_previewCancellation);
         using var cancellation = _previewCancellation = new CancellationTokenSource();
         Directory.CreateDirectory(FolderPath);
         var path = Path.Combine(FolderPath, PreviewName);
@@ -85,10 +96,38 @@ internal sealed class CaptureService(PlayerService player, IBridgeEvents events,
         }
     }
 
+    /// <summary>
+    /// The picture at <paramref name="seconds"/> as JPEG in base64, to choose a clip's bounds by sight; null when a newer
+    /// request replaced this one. The subtitles are drawn when asked, like in the clip.
+    /// </summary>
+    public async Task<string?> ReadFrameAtAsync(double seconds, bool withSubtitles)
+    {
+        var source = _clipSource ?? throw new BridgeException("Ce clip n'est plus disponible : relance la capture depuis le lecteur.");
+        if (seconds < 0) throw new BridgeException("Ce moment est avant le début de l'épisode.");
+
+        Cancel(_scrubCancellation);
+        using var cancellation = _scrubCancellation = new CancellationTokenSource();
+        var folder = Path.Combine(FolderPath, ScrubFolderName);
+        try
+        {
+            var path = await FrameGrabber.RenderAsync(source, seconds, withSubtitles, folder, cancellation.Token);
+            return Convert.ToBase64String(await File.ReadAllBytesAsync(path, cancellation.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        finally
+        {
+            DeleteFolder(folder);
+        }
+    }
+
     /// <summary>Removes the frames and forgets the player, once the workshop closes.</summary>
     public void Discard()
     {
-        _previewCancellation?.Cancel();
+        Cancel(_previewCancellation);
+        Cancel(_scrubCancellation);
         _clipSource = null;
         DeleteFrames();
     }
@@ -188,6 +227,31 @@ internal sealed class CaptureService(PlayerService player, IBridgeEvents events,
     private static void DeleteFrames()
     {
         foreach (var name in new[] { PlainFrameName, SubtitledFrameName, PreviewName }) DeleteFile(Path.Combine(FolderPath, name));
+    }
+
+    // <-- Une demande finie a déjà libéré sa source : l'annuler après coup n'est pas une erreur -->
+    private static void Cancel(CancellationTokenSource? source)
+    {
+        try
+        {
+            source?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            Debug.WriteLine("[capture] request already finished");
+        }
+    }
+
+    private static void DeleteFolder(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"[capture] folder kept: {error.Message}");
+        }
     }
 
     private static void DeleteFile(string path)

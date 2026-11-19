@@ -51,7 +51,17 @@ public sealed class SettingsStore
         SearchSiteUrl = patch.SearchSiteUrl ?? settings.SearchSiteUrl,
         MangaSiteUrl = patch.MangaSiteUrl ?? settings.MangaSiteUrl,
         SongFileHostUrl = patch.SongFileHostUrl ?? settings.SongFileHostUrl,
+        ClipEngine = patch.ClipEngine ?? settings.ClipEngine,
+        ClipPresetId = patch.ClipPresetId ?? settings.ClipPresetId,
+        AreEpisodeArrowsShown = patch.AreEpisodeArrowsShown ?? settings.AreEpisodeArrowsShown,
+        IsNextEpisodePromptShown = patch.IsNextEpisodePromptShown ?? settings.IsNextEpisodePromptShown,
+        PlayerScreenMode = patch.PlayerScreenMode ?? settings.PlayerScreenMode,
+        PlayerScreenName = patch.PlayerScreenName ?? settings.PlayerScreenName,
+        ClipPresets = patch.ClipPresets?.Select(preset => preset with { IsBuiltIn = false }).ToList() ?? settings.ClipPresets,
     });
+
+    /// <summary>Remembers where the player window was, for the mode that reopens it there.</summary>
+    public void SavePlayerWindow(Player.PlayerWindowPlacement placement) => Update(settings => settings with { PlayerWindow = placement });
 
     public string? ReadToken()
     {

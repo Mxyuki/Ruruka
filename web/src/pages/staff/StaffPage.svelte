@@ -1,6 +1,8 @@
 <script lang="ts">
   import { fetchStaff, type VoicedCharacter } from '../../api/queries/people';
+  import { toggleFavourite } from '../../api/queries/favourites';
   import DetailLayout from '../../components/DetailLayout.svelte';
+  import FavouriteButton from '../../components/FavouriteButton.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import LoadingState from '../../components/LoadingState.svelte';
   import MediaCard from '../../components/MediaCard.svelte';
@@ -47,6 +49,9 @@
       ['Favoris', staff.favourites.toLocaleString('fr-FR')],
     ]}
   >
+    {#snippet actions()}
+      <FavouriteButton isFavourite={staff.isFavourite} ontoggle={() => toggleFavourite('staff', staff.id)} />
+    {/snippet}
     {#if staff.characterRoles.length}
       <Section title="Rôles de doublage · {staff.characterRoles.length}">
         {#snippet action()}

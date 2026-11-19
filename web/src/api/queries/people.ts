@@ -20,6 +20,7 @@ export interface CharacterDetails {
   bloodType: string | null;
   dateOfBirth: FuzzyDate;
   favourites: number;
+  isFavourite: boolean;
   media: { characterRole: string; voiceRoles: VoiceRole[]; node: MediaSummary }[];
 }
 
@@ -47,6 +48,7 @@ const characterQuery = `
       bloodType
       dateOfBirth { year month day }
       favourites
+      isFavourite
       media(sort: POPULARITY_DESC, perPage: 30) {
         edges {
           characterRole
@@ -93,6 +95,7 @@ export interface StaffDetails {
   yearsActive: number[];
   dateOfBirth: FuzzyDate;
   favourites: number;
+  isFavourite: boolean;
   /** Every voiced character once, with its first appearance (earliest media), newest first. */
   characterRoles: VoicedCharacter[];
   staffRoles: { staffRole: string; node: MediaSummary }[];
@@ -112,6 +115,7 @@ const staffQuery = `
       yearsActive
       dateOfBirth { year month day }
       favourites
+      isFavourite
       staffMedia(sort: POPULARITY_DESC, perPage: 30) {
         edges { staffRole node { ${mediaSummaryFields} } }
       }
@@ -177,6 +181,7 @@ export interface StudioDetails {
   name: string;
   isAnimationStudio: boolean;
   favourites: number;
+  isFavourite: boolean;
   media: MediaSummary[];
 }
 
@@ -187,6 +192,7 @@ const studioQuery = `
       name
       isAnimationStudio
       favourites
+      isFavourite
       media(sort: START_DATE_DESC, isMain: true, perPage: 50) { nodes { ${mediaSummaryFields} } }
     }
   }

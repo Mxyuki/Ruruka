@@ -8,7 +8,8 @@ public sealed record CaptureOffer(int MediaId, int Episode, string Title, double
 
 /// <param name="Quality">"max" keeps the best quality; "discord" fits the clip under 10 MB.</param>
 /// <param name="Format">"mp4" (H.264, plays everywhere) or "webm" (VP9, light and fine for the web).</param>
-public sealed record ClipRequest(double StartSeconds, double EndSeconds, CropArea? Crop, bool WithSubtitles, string Quality, string FileName, string Format = ClipEncoder.FormatMp4);
+/// <param name="PresetId">With the ffmpeg engine, the preset that encodes the clip; then quality and format are ignored.</param>
+public sealed record ClipRequest(double StartSeconds, double EndSeconds, CropArea? Crop, bool WithSubtitles, string Quality, string FileName, string Format = ClipEncoder.FormatMp4, string? PresetId = null);
 
 /// <summary>The range, crop and subtitles the preview should show.</summary>
 public sealed record ClipPreviewRequest(double StartSeconds, double EndSeconds, CropArea? Crop, bool WithSubtitles);

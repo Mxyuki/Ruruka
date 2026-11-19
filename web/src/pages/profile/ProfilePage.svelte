@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fetchUserActivity } from '../../api/queries/activity';
+  import { saveFavouriteOrder, type FavouriteGroup } from '../../api/queries/favourites';
   import { fetchUserProfile, toggleFollow, type TypeStatistics } from '../../api/queries/user';
   import ActivityFeed from '../../components/ActivityFeed.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -20,6 +21,7 @@
 
   const profile = $derived(fetchUserProfile(params.name ?? ''));
   const isViewer = $derived(session.viewer?.name === params.name);
+  let isReordering = $state(false);
   let isFollowingOverride = $state<boolean | null>(null);
   const aboutCollapsedHeight = 360;
   let isAboutExpanded = $state(false);
@@ -31,6 +33,17 @@
       isFollowingOverride = await toggleFollow(userId, name);
     } catch (error) {
       toasts.error(error, 'Impossible de modifier l’abonnement');
+    }
+  }
+
+  // <-- Chaque dépôt est enregistré tout de suite ; en cas d'échec la grille revient à l'ordre d'avant -->
+  async function saveOrder(group: FavouriteGroup, ids: number[]): Promise<boolean> {
+    try {
+      await saveFavouriteOrder(group, ids);
+      return true;
+    } catch (error) {
+      toasts.error(error, 'Impossible d’enregistrer l’ordre des favoris');
+      return false;
     }
   }
 
@@ -127,20 +140,46 @@
           </Section>
         {/if}
 
-        {#each [['Anime favoris', user.favourites.anime.nodes], ['Manga favoris', user.favourites.manga.nodes]] as const as [title, nodes] (title)}
+        <!-- Réorganiser ses favoris : glisser une image sur une autre -->
+        {#if isViewer}
+          <div class="reorder">
+            <button class="btn" class:btn-primary={isReordering} type="button" aria-pressed={isReordering} onclick={() => (isReordering = !isReordering)}>
+              {isReordering ? 'Terminer' : 'Réorganiser mes favoris'}
+            </button>
+            {#if isReordering}<span class="faint">Glisse une image sur une autre : elle prend sa place.</span>{/if}
+          </div>
+        {/if}
+
+        {#each [['Anime favoris', user.favourites.anime.nodes, 'anime'], ['Manga favoris', user.favourites.manga.nodes, 'manga']] as const as [title, nodes, group] (title)}
           {#if nodes.length}
             <Section {title}>
-              <FavouriteGrid items={nodes} keyOf={(media) => media.id} minItemWidth={168} columnGap="var(--space5)" rowGap="var(--space6)">
+              <FavouriteGrid
+                items={nodes}
+                keyOf={(media) => media.id}
+                minItemWidth={168}
+                columnGap="var(--space5)"
+                rowGap="var(--space6)"
+                {isReordering}
+                onreorder={(ids) => saveOrder(group, ids)}
+              >
                 {#snippet cell(media)}<MediaCard {media} />{/snippet}
               </FavouriteGrid>
             </Section>
           {/if}
         {/each}
 
-        {#each [['Personnages favoris', user.favourites.characters.nodes, characterPath], ['Créateurs favoris', user.favourites.staff.nodes, staffPath]] as const as [title, nodes, pathFor] (title)}
+        {#each [['Personnages favoris', user.favourites.characters.nodes, characterPath, 'character'], ['Créateurs favoris', user.favourites.staff.nodes, staffPath, 'staff']] as const as [title, nodes, pathFor, group] (title)}
           {#if nodes.length}
             <Section {title}>
-              <FavouriteGrid items={nodes} keyOf={(person) => person.id} minItemWidth={96} columnGap="var(--space4)" rowGap="var(--space4)">
+              <FavouriteGrid
+                items={nodes}
+                keyOf={(person) => person.id}
+                minItemWidth={96}
+                columnGap="var(--space4)"
+                rowGap="var(--space4)"
+                {isReordering}
+                onreorder={(ids) => saveOrder(group, ids)}
+              >
                 {#snippet cell(person)}
                   <a class="person" href="#{pathFor(person.id)}" title={person.name.userPreferred} style:--tilt="{((person.id * 37) % 5) - 2}deg">
                     <img src={person.image.medium} alt="" loading="lazy" />
@@ -175,6 +214,14 @@
 {/await}
 
 <style>
+  .reorder {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space3);
+    margin-bottom: var(--space5);
+  }
+
   .banner {
     display: flex;
     align-items: flex-end;

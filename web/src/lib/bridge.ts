@@ -59,6 +59,39 @@ export interface Settings {
   mangaSiteUrl: string;
   /** Server hosting the anime song files named by AnisongDB; empty hides the players. */
   songFileHostUrl: string;
+  /** "mpv" cuts clips with the player's own encoder; "ffmpeg" runs the chosen preset (needs the downloaded ffmpeg). */
+  clipEngine: ClipEngine;
+  /** The preset ffmpeg clips are cut with. */
+  clipPresetId: string;
+  /** Built-in presets first, then the user's own. */
+  clipPresets: ClipPreset[];
+  /** The player's bar shows « précédent » and « suivant » arrows when those episodes are in the library. */
+  areEpisodeArrowsShown: boolean;
+  /** The last seconds of an episode offer the next one in a card. */
+  isNextEpisodePromptShown: boolean;
+  playerScreenMode: PlayerScreenMode;
+  /** The monitor of the "fixed" mode, by its Windows device name. */
+  playerScreenName: string;
+}
+
+export type ClipEngine = 'mpv' | 'ffmpeg';
+
+/** A named ffmpeg command: the output options only, Ruruka adds the input, the range, the tracks and the crop. */
+export interface ClipPreset {
+  id: string;
+  name: string;
+  /** Options placed before the output file; {videoKbps}, {maxrateKbps} and {bufsizeKbps} fit a Discord size. */
+  arguments: string;
+  extension: ClipExtension;
+  /** Built-in presets can't be edited: they are duplicated first. */
+  isBuiltIn: boolean;
+}
+
+export type ClipExtension = 'mp4' | 'webm' | 'mkv';
+
+export interface FfmpegStatus {
+  isInstalled: boolean;
+  isInstalling: boolean;
 }
 
 export type PlayerKind = 'ruruka' | 'mpv';
@@ -100,7 +133,35 @@ export interface PlaybackTarget {
   title: string;
   /** AniList cover shown on Discord. */
   coverUrl: string;
+  /** What the Ruruka player's bar offers around this episode. */
+  navigation?: EpisodeNavigation;
 }
+
+/** The episodes the player's bar offers, each null when there is nothing to offer. */
+export interface EpisodeNavigation {
+  /** The « précédent » arrow. */
+  previousEpisode: number | null;
+  /** The « suivant » arrow. */
+  nextEpisode: number | null;
+  /** The card shown in the last seconds. */
+  promptEpisode: number | null;
+}
+
+/** A monitor, as the settings page lists it. */
+export interface ScreenChoice {
+  /** Windows device name, such as \\.\DISPLAY2. */
+  name: string;
+  /** 1-based, in the order Windows lists them. */
+  number: number;
+  width: number;
+  height: number;
+  isPrimary: boolean;
+  /** The Ruruka window is on this one. */
+  isAppScreen: boolean;
+}
+
+/** Where a new player window opens: on the monitor of Ruruka, on a chosen one, or where it was closed. */
+export type PlayerScreenMode = 'app' | 'fixed' | 'last';
 
 /** The session's episode as a friend follows it, with or without a player on this PC. */
 export interface SessionEpisode {
@@ -144,6 +205,8 @@ export interface ClipRequest {
   withSubtitles: boolean;
   quality: ClipQuality;
   format: ClipFormat;
+  /** With the ffmpeg engine, the preset that encodes the clip; quality and format are then ignored. */
+  presetId?: string;
   fileName: string;
 }
 
@@ -209,6 +272,7 @@ interface BridgeApi {
   'player.detect': [void, PlayerStatus];
   'player.setPath': [{ path: string }, boolean];
   'player.play': [PlaybackTarget, boolean];
+  'player.screens': [void, ScreenChoice[]];
   /** Moves this PC's player toward the host's position during a synced session. */
   'player.followHost': [{ positionSeconds: number; isPaused: boolean }, boolean];
   'player.releaseFromHost': [void, boolean];
@@ -217,6 +281,8 @@ interface BridgeApi {
   /** The frame taken by the capture button as PNG in base64; null once the workshop closed. */
   'capture.getFrame': [{ withSubtitles: boolean }, string | null];
   /** Asks where to save, then cuts the clip from the original file; null when the user cancelled. */
+  /** The picture at a second as JPEG in base64; null when a newer request replaced it. */
+  'capture.getFrameAt': [{ seconds: number; withSubtitles: boolean }, string | null];
   'capture.saveClip': [ClipRequest, ClipSaved | null];
   /** A small MP4 of the range in base64 (its first minute at most); null when a newer preview replaced it. */
   'capture.previewClip': [ClipPreviewRequest, string | null];
@@ -250,6 +316,13 @@ interface BridgeApi {
   'window.readyToQuit': [void, boolean];
   /** The anime of a ruruka:// link waiting for the UI, once; null otherwise. */
   'window.takeMediaLink': [void, number | null];
+  'ffmpeg.status': [void, FfmpegStatus];
+  /** Downloads and checks ffmpeg; progress arrives as `ffmpeg.progress`. */
+  'ffmpeg.install': [void, boolean];
+  'ffmpeg.cancelInstall': [void, boolean];
+  'ffmpeg.remove': [void, boolean];
+  /** True once when the installer asked for ffmpeg. */
+  'ffmpeg.takeInstallRequest': [void, boolean];
   'update.check': [void, UpdateInfo | null];
   'update.install': [void, boolean];
   /** Read-only call to the manga site API (`/manga…`, `/at-home/server/…`), proxied because that API has no CORS. */
@@ -269,11 +342,15 @@ export interface BridgeEvents {
   'stream.chunkNeeded': { requestId: string; offset: number; length: number };
   /** The episode reached its end; with isPlayerKeptOpen, mpv stays open on the last frame. */
   'player.ended': { mediaId: number; episode: number };
+  /** The person pressed « précédent » or « suivant » in the player. */
+  'player.episodeRequested': { mediaId: number; episode: number; direction: 'previous' | 'next' };
   'player.closed': { mediaId: number; episode: number; watchedRatio: number };
   /** The capture button of the Ruruka player was pressed: the frame is ready for `capture.getFrame`. */
   'capture.ready': CaptureOffer;
   'capture.failed': { message: string };
   'capture.clipProgress': { ratio: number };
+  /** How far the ffmpeg download is, 0 to 1. */
+  'ffmpeg.progress': { ratio: number };
   /** The app is really quitting (not hiding to the tray); answer with "window.readyToQuit" within 5 s. */
   'window.closing': Record<string, never>;
   /** A ruruka:// link reached the running app: collect it with "window.takeMediaLink". */

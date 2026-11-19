@@ -319,9 +319,9 @@ internal sealed class MainForm : Form
         var router = new BridgeRouter();
         var notifier = new BackgroundPlaybackNotifier(events, this, _tray);
         _presence = new DiscordPresence(_settings, notifier, () => BeginInvoke(ShowFromTray));
-        var player = new PlayerService(_settings, notifier, _presence);
+        var player = new PlayerService(_settings, notifier, _presence, () => WindowState == FormWindowState.Minimized ? RestoreBounds : Bounds);
         var stream = new StreamService(player, events);
-        var capture = new CaptureService(player, events, () => BeginInvoke(ShowOverPlayer));
+        var capture = new CaptureService(player, _settings, events, () => BeginInvoke(ShowOverPlayer));
         capture.Attach();
         new StreamResources(stream, _environment!, IsAppOrigin).Attach(core);
         IBridgeModule[] modules =
@@ -332,6 +332,7 @@ internal sealed class MainForm : Form
             new CalendarModule(_calendar),
             new PlayerModule(player),
             new CaptureModule(capture, this),
+            new FfmpegModule(new FfmpegService(), events),
             new StreamModule(stream),
             new DiscordModule(_presence),
             new ShellModule(this),

@@ -15,6 +15,7 @@
 | Ruruka player | The same mpv, shipped in `player/` with an isolated `--config-dir` and a Lua interface (`assets/player/scripts/ruruka-osc.lua`) | WebView2's `<video>` can't read what mpv reads (MKV, ASS…), and a web page can't be drawn over a native video surface in a normal WebView2 window. A script draws inside the video, so its bar really floats over it, and the IPC tracking stays the same. mpv is GPL: it stays a separate program, with its notice in `assets/player/licenses/`. `scripts/fetch-mpv.ps1` downloads a pinned, hash-checked build into `.tools/mpv`. |
 | Discord activity | Discord's local RPC over its named pipe (`discord-ipc-0…9`), a ~150-line client in `Discord/DiscordIpcClient.cs` | The pipe is all Rich Presence needs, so the Discord SDK (a native DLL) would add weight for one command. |
 | Discord button page | Static page in `site/open/`, published on GitHub Pages by `.github/workflows/pages.yml` | Discord buttons only take http(s) links, so `ruruka://` can't be the button itself. A static page needs no server, and only `site/` is published. |
+| Advanced clips (optional) | ffmpeg `essentials` build for Windows, pinned and SHA-256 checked, downloaded on request into `%LOCALAPPDATA%/Ruruka/ffmpeg` (`Capture/FfmpegService.cs`) | mpv's encoder only takes its own `--ovcopts`, so a person's own ffmpeg command (`-c:v libx265 -x265-params …`) can't run in it. ffmpeg is ~40 MB to download (7z, read by Windows 11's `tar`), so it is neither shipped nor required: clips use mpv until the person turns ffmpeg on in Settings or ticks the installer option. It stays a separate GPL program with its licence next to it. |
 | Stream link | WebRTC data channel, set up through the sealed relay | Opens no port and encrypts end to end, with nothing to run online. WebView2 includes it, so there's no new dependency. STUN alone fails on some networks (see Stream below), and a TURN relay would add a server and its bandwidth bill. |
 
 Runtime memory levers already in place: workstation non-concurrent GC in the host,
@@ -77,9 +78,9 @@ src/Ruruka.Desktop/          C# host
   Calendar/                  calendar.json: personal events and anime hidden from the calendar (CalendarStore)
   Discord/                   Discord activity and session invitations: activity contents (DiscordActivity), pipe protocol (DiscordIpcClient), latest-state worker (DiscordPresence)
   Player/                    mpv discovery (MpvLocator), bundled player (PlayerChoice), process + IPC (MpvSession), watched-time maths (WatchTracker), host following (SyncCorrection)
-  Capture/                   capture workshop: frames and clip request (CaptureService), clip cut with mpv's encoder (ClipEncoder)
+  Capture/                   capture workshop: frames and clip request (CaptureService), clip cut with mpv's encoder (ClipEncoder) or the user's ffmpeg command (FfmpegClipEncoder, presets in ClipPreset), optional ffmpeg download (FfmpegService)
   Streaming/                 group watch stream: shared file + local address (StreamService), mpv's HTTP side (LoopbackStreamServer), bytes to the UI (StreamResources)
-  Windowing/                 Windows 11 title-bar theming (DWM), tray icon, Ruruka icon on the player window (WindowIcon), startup with Windows (StartupRegistration), ruruka:// links (MediaLink)
+  Windowing/                 Windows 11 title-bar theming (DWM), tray icon, Ruruka icon on the player window (WindowIcon), the player window's place (WindowGeometry), startup with Windows (StartupRegistration), ruruka:// links (MediaLink)
   Updates/                   GitHub release check + installer download (UpdateService)
   Manga/                     read-only gateway to the manga site API chosen in Settings (MangaSiteClient): allow-listed paths, ≤ 4 requests/s
 
@@ -93,7 +94,7 @@ web/src/
   lib/                       helpers with no app state: bridge, router, routes, format, html, markdown, aboutTemplate, spoilers, searchSite, titleMatch, watchCode, filterPicks
   api/                       client.ts (fetch, throttle, errors), cache.ts, types.ts, anisongdb.ts (anime songs, not AniList), mangaSite.ts, watchRelay.ts (group watch relay)
     queries/                 GraphQL documents + typed fetchers, one file per domain
-  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, groupWatch, updates, toasts
+  state/                     .svelte.ts stores: session (viewer + settings), mediaList, library, playback, liveAbout, groupWatch, updates, ffmpeg, toasts
   components/                UI used by 2+ features (MediaCard, Modal, ScoreBadge…)
   pages/<feature>/           a route's page and its private sections
 ```
@@ -126,11 +127,15 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `calendar.get` / `calendar.saveEvent` / `calendar.removeEvent` | Personal calendar events. `saveEvent` adds, or replaces the event with the same id |
 | `calendar.hideMedia` / `calendar.showMedia` | Anime hidden from the calendar. `showMedia` takes several ids, for the automatic cleanup |
 | `player.detect` / `player.setPath` / `player.play` | Find or pick mpv, launch an episode with tracking |
+| `player.screens` | The monitors (Windows device name, number, size, primary, the one Ruruka is on), for the player window setting |
 | `player.followHost` / `player.releaseFromHost` | Keep this PC's player on the host's position, or stop |
 | `player.applyControl` | Host: apply the pause or seek of a friend allowed to control playback |
 | `capture.getFrame` | The frame the player's capture button froze, as PNG in base64 (`withSubtitles` picks the copy with the subtitles drawn). Null once the workshop closed |
+| `capture.getFrameAt` | The picture at a given second, as JPEG in base64 (a one-frame mpv run, `FrameGrabber`; `withSubtitles` draws them). Shown over the workshop's frame while a clip bound is moved or typed. Null when a newer request replaced it |
 | `capture.previewClip` | A small MP4 (360p, first minute at most) of the range with the chosen crop and subtitles, as base64. Null when a newer preview replaced it |
-| `capture.saveClip` / `capture.cancelClip` | Asks where to save an MP4 or WebM (`format`; the host shows the dialog), cuts the clip from the original file, null when cancelled. Progress arrives as `capture.clipProgress` |
+| `capture.saveClip` / `capture.cancelClip` | Asks where to save the clip (MP4 or WebM with mpv; the preset's extension with ffmpeg; the host shows the dialog), cuts it from the original file, null when cancelled. With `AppSettings.ClipEngine` = `ffmpeg` and ffmpeg downloaded, `presetId` picks the ffmpeg command, else `quality` and `format` drive mpv. Progress arrives as `capture.clipProgress` |
+| `ffmpeg.status` / `ffmpeg.install` / `ffmpeg.cancelInstall` / `ffmpeg.remove` | The optional ffmpeg: is it on disk, download it (progress as `ffmpeg.progress`), stop, delete it |
+| `ffmpeg.takeInstallRequest` | True once when the installer's « clips avancés » option was ticked (a flag file `install-ffmpeg.flag`); the UI then downloads ffmpeg and turns the engine on |
 | `capture.discard` | Deletes the temporary frames when the workshop closes |
 | `stream.share` / `stream.stopSharing` | Host: share the file its player opened. The UI never sends a path |
 | `stream.play` / `stream.closeViewer` | Friend: open the local address fed by the UI and play it, or close it |
@@ -157,6 +162,8 @@ Methods are typed in `web/src/lib/bridge.ts` (`BridgeApi`) and registered in
 | `capture.ready` | `{ mediaId, episode, title, positionSeconds, durationSeconds, hasSubtitles, canClip }`. The capture button of the Ruruka player was pressed and the frames are on disk |
 | `capture.failed` | `{ message }`. The frame couldn't be taken |
 | `capture.clipProgress` | `{ ratio }`. How far the clip is cut, 0 to 1 |
+| `ffmpeg.progress` | `{ ratio }`. How far the ffmpeg download is, 0 to 1 |
+| `player.episodeRequested` | `{ mediaId, episode, direction }`. The person pressed « précédent » or « suivant » in the Ruruka player (bar arrows or the `<` and `>` keys); `direction` is `previous` or `next` |
 | `player.ended` | `{ mediaId, episode }`. The episode reached its end (mpv's `eof-reached`); with « garder mpv ouvert », mpv stays on the last frame instead of closing |
 | `player.closed` | `{ mediaId, episode, watchedRatio }`. mpv quit; an episode replaced in the same window never gets one |
 | `window.mediaLinkOpened` | `{}`. A `ruruka://` link reached the running app |
@@ -204,11 +211,29 @@ a bitrate that stays under 10 MB and shrinks frames taller than 720 px. The prev
 so it shows the exact cut (range, crop, subtitles) in a few seconds, and is deleted with the other temporary files. Progress comes from `--term-status-msg`. The crop
 is applied by mpv's `crop` filter, in even pixels (yuv420p), and subtitles are drawn on the cropped picture.
 
+**Clip engine and presets.** `AppSettings.ClipEngine` is `mpv` (default, nothing to download) or `ffmpeg`. The ffmpeg engine runs a *preset*: a name, an extension and a command made of output options only
+(`-c:v libx265 -crf 24 …`). `FfmpegClipEncoder` puts Ruruka's part around it: `-ss start -i file -t length`, `-map 0:v:0` and the player's audio track (`0:a:<id-1>`), then one `-vf` chain, then the preset, then the output.
+The chain burns the player's subtitles first (`setpts` back to the file's time, since `-ss` before `-i` restarts at 0, the subtitle delay folded in, `subtitles=…:si=<id-1>` or the external file), then the crop in even pixels; a `-vf` written in the preset
+is merged at the end of that chain, since a second `-vf` would replace it. `{videoKbps}`, `{maxrateKbps}` and `{bufsizeKbps}` in a command are filled from the clip's length to stay under 10 MB (the same maths as mpv's Discord mode).
+« Qualité max » and « Léger pour Discord » are built-in presets (`ClipPresetCatalog`, read-only: duplicated to be edited); the user's are in `AppSettings.ClipPresets` and validated by `SettingsModule` (name, extension, balanced quotes, and none of the options
+Ruruka sets itself: `-i -y -n -ss -t -to -filter_complex -progress`). The preview always runs mpv's fast 360p encoder, so it shows the cut (range, crop, subtitles) but not a preset's codec. In the workshop, the Clip tab swaps the quality and format chips for one chip per preset, the command under them,
+and « Réglages avancés » (`ClipPresetDialog`). The range is one two-point slider (`RangeSlider`, the points never cross) with two editable time fields (`TimeField`, `lib/clock.ts` reads « 75 », « 1:15 » or « 1:15.5 »).
+
+**ffmpeg download.** `FfmpegService` downloads the pinned 7z (URL, release and SHA-256 are constants at the top of the file; bump all three together), checks the hash before touching it, unpacks it with Windows 11's `tar.exe` in a work folder and keeps only `ffmpeg.exe` and `LICENSE`.
+Three ways in, all through `state/ffmpeg.svelte.ts`: Settings → Capture et clips → « ffmpeg » (downloads if missing, then switches the engine), the installer's unchecked task (it writes `install-ffmpeg.flag`; the UI collects it at startup with `ffmpeg.takeInstallRequest`, so the progress and the toasts are the app's own),
+and choosing « mpv » back at any time, which keeps ffmpeg on disk until « Supprimer ffmpeg ». Selecting the ffmpeg engine without the file is refused by the host.
+
 **Explorer and the viewer's list.** When the « Ma liste » filter holds only list statuses (no « Pas dans ma liste »), `SearchPage` doesn't page through AniList: it filters the loaded list in `pages/search/localBrowse.ts`. Genres, tags and popularity aren't in a list entry, so `fetchListTraits` reads them for the whole list in one call (cached 10 minutes, keyed by the entry count). The grid reports its column count (`lib/gridColumns.ts`) and shows only full rows while more can be loaded, so the last row is never short on wide screens.
 
-**Activity graph.** `pages/profile/ActivityGraph.svelte` draws the last 365 days from `User.stats.activityHistory` (`fetchActivityHistory`), as weeks of seven days, Monday first. AniList dates each day at local midnight of an unstated timezone, so `activityGrid.ts` reads the civil date 12 hours later. Hover bubbles are CSS (`data-tip`), no script.
+**Activity graph.** `pages/profile/ActivityGraph.svelte` draws the last six months from `User.stats.activityHistory`, which is all AniList returns (its oldest day was about 6 months back for every account tried; a longer grid would show false empty days) (`fetchActivityHistory`), as weeks of seven days, Monday first. AniList dates each day at local midnight of an unstated timezone, so `activityGrid.ts` reads the civil date 12 hours later. Hover bubbles are CSS (`data-tip`), no script.
 
-**Player options.** Settings → Lecteur Ruruka holds `isCaptureEnabled` (the camera button and `c` key) and `isClipEnabled` (the Clip tab), both on by default.
+**Settings page.** `SettingsPage` is a row of tabs, each one a component in `pages/settings/`: Général (account, theme, interface size, window and startup, updates), Lecture (player, episode arrows and next-episode card, player window place, watched thresholds), Capture et clips (capture and clip toggles, engine), Bibliothèque (anime folder, sites), Pages et profil (section order, calendar, comparison, profile videos). The shared card pieces are the `settings-*` classes in `pages/settings/settings.css`.
+
+**Episode arrows and the next-episode card.** Only the bundled player draws them (`ruruka-osc.lua`). The UI decides what is on offer, because it knows which files exist: `playback.navigationFor` builds an `EpisodeNavigation` (previous, next, prompt episode, each null when absent) that rides on `player.play`, and the host turns it into `--script-opts=ruruka-previous=…,ruruka-next=…,ruruka-prompt=…` (an episode number or `no`). The script reads them with `mp.get_opt`, which is dynamic, so an episode loaded into the open window sets them again (`set_property script-opts`) and the script re-reads at each `file-loaded`. The arrows are bar buttons (`AppSettings.AreEpisodeArrowsShown`) plus the `<` and `>` keys from `input.conf`; they send `script-message ruruka-episode previous|next`, which mpv relays to IPC clients like the capture message, and the host emits `player.episodeRequested`; the UI plays that episode and drops any chain. The card (`AppSettings.IsNextEpisodePromptShown`) appears when `time-remaining` is 10 s or less, with a « Regarder » button and a close cross, and has no prompt while a chain of episodes is running (the first episodes of 7 to 9 chain by themselves): the UI only gives a prompt episode for the last one of a chain. It draws even when the bar is hidden, with the refresh timer running only while it is on screen. Settings changes apply from the next episode launched.
+
+**Player window place.** `AppSettings.PlayerScreenMode`: `app` (default: the monitor the Ruruka window is on), `fixed` (`PlayerScreenName`, a Windows device name; a monitor no longer plugged in falls back to Ruruka's) or `last` (where the window was last closed). Only a new window is placed: an episode loaded into an open window keeps its place. `PlayerWindowOptions.Resolve` gives mpv `--screen` and `--fs-screen` (the index in `Screen.AllScreens`, the same `EnumDisplayMonitors` order mpv uses) and, for `last`, `--geometry` relative to that monitor plus `--window-maximized`; with one monitor it gives nothing, so mpv behaves as before. For `last`, the host reads the video area of the mpv window (`WindowGeometry`, `GetClientRect` and `GetWindowPlacement`) at each sync point, with no timer, skipping minimized and full-screen states, and `PlayerService` saves it to `AppSettings.PlayerWindow` when mpv closes. A change moved less than one sync interval (2 s) before closing is lost. The user's own mpv is never placed.
+
+**Player options.** Settings → Capture et clips holds `isCaptureEnabled` (the camera button and `c` key) and `isClipEnabled` (the Clip tab), both on by default.
 The capture option reaches the Lua script as `--script-opts=ruruka-capture=yes|no` when the player starts, so it applies to the next window.
 
 **Player window.** The bundled mpv gets the Ruruka icon through `WM_SETICON` once it reports `window-id` (`WindowIcon`), so the taskbar
@@ -406,6 +431,8 @@ combination, so only the activities' own pairs are kept, up to 3 pages of 50) an
 next to the title. The feed query also brings `likes` so hovering a heart lists who liked, with no request per hover.
 
 **Notification targets.** `fetchNotifications` asks each notification what it points at and turns it into a `target`, a label plus a link. A liked list activity names the media and opens it. A status, a message or a reply quotes a plain-text excerpt (`excerptHtml`, spoilers hidden) and opens `/activity/:id`, the one page showing an activity with its replies open. The `activity` field of a notification can come without its media, so the notifications only bring `activityId`, and a second query reads those activities with `activities(id_in:)`. AniList doesn't say which reply was liked either, so that query also brings the replies, and the viewer's latest one liked by that user is picked; `?reply=` brings it into view. The app has no forum, so forum targets open `siteUrl` in the browser. Liked forum comments quote the comment, the rest quote the thread title.
+
+**Favourites.** Character, staff and studio pages carry a `FavouriteButton` (`ToggleFavourite`, the heart flips at once and goes back on an error; hidden when logged out), like media pages. On the viewer's own profile, « Réorganiser mes favoris » makes the images of the four favourite grids draggable (`FavouriteGrid`, HTML drag and drop): dropping one on another gives it that place, and each drop is saved with `UpdateFavouriteOrder` (`api/queries/favourites.ts`, orders 1…n for the 25 favourites shown). Only the first 25 of a kind are loaded, so with more than that, the later ones keep their old order numbers. Studios are names, not images, so they aren't reorderable.
 
 **Even grids.** Profile favourites (25 per kind, like anilist.co) use `pages/profile/FavouriteGrid.svelte`: as many
 columns as fit, then equal rows (25 → 9 + 9 + 7), the short row centered. The media page's characters show as many
