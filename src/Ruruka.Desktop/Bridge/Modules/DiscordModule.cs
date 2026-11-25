@@ -33,7 +33,7 @@ internal sealed partial class DiscordModule(DiscordPresence presence) : IBridgeM
         if (parameters.Code is null) return null;
         if (!WatchCode().IsMatch(parameters.Code)) throw new BridgeException("Code de séance invalide.");
         if (parameters.MemberCount is < 1 or > MaxMemberCount) throw new BridgeException("Nombre de détectives invalide.");
-        return new SessionInvite(parameters.Code, parameters.MemberCount);
+        return new SessionInvite(parameters.Code, parameters.MemberCount, DiscordActivity.CleanSessionName(parameters.SessionName));
     }
 
     [GeneratedRegex("^[2-9A-Z]{5}-[2-9A-Z]{5}$")]
@@ -42,7 +42,7 @@ internal sealed partial class DiscordModule(DiscordPresence presence) : IBridgeM
     [GeneratedRegex(@"^\d{1,20}$")]
     private static partial Regex UserId();
 
-    private sealed record SessionParams(string? Code, int MemberCount, IReadOnlyList<string> CompanionNames, SessionEpisode? Watching);
+    private sealed record SessionParams(string? Code, int MemberCount, IReadOnlyList<string> CompanionNames, SessionEpisode? Watching, string? SessionName);
 
     private sealed record AcceptParams(string UserId);
 }

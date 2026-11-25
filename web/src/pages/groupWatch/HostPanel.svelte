@@ -8,6 +8,7 @@
   import StreamViewers from './StreamViewers.svelte';
   import WatchModePicker from './WatchModePicker.svelte';
 
+  const maxSessionNameLength = 40;
   const playing = $derived(playback.nowPlaying && !playback.nowPlaying.isRemote ? playback.nowPlaying : null);
 
   async function copyCode() {
@@ -34,6 +35,19 @@
   {#if groupWatch.isReconnecting}
     <p class="warning">Connexion au relais perdue, on la rétablit…</p>
   {/if}
+
+  <!-- Nom affiché sur l'invitation Discord -->
+  <label class="name-field">
+    <span class="note-label">Nom de la séance</span>
+    <input
+      class="input"
+      maxlength={maxSessionNameLength}
+      placeholder="par ex. Group Watch · Meitantei Precure"
+      value={groupWatch.sessionName}
+      onchange={(event) => groupWatch.renameSession(event.currentTarget.value)}
+    />
+    <span class="hint">Visible sur Discord quand tu invites, entre deux épisodes seulement.</span>
+  </label>
 
   <h3 class="note-label">Comment tes amis regardent</h3>
   <WatchModePicker />
@@ -85,6 +99,18 @@
 
   p {
     margin: 0;
+  }
+
+  .name-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space1);
+    width: 100%;
+  }
+
+  .hint {
+    color: var(--textFaint);
+    font-size: var(--fontSizeSm);
   }
 
   .warning {

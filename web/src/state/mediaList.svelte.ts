@@ -27,9 +27,19 @@ export function statusChangesFor(entry: EntryState | undefined, progress: number
   return entry ? {} : { status: 'PLANNING' };
 }
 
+/**
+ * Finishing episode 1 of a completed anime starts a rewatch; any other episode of it changes nothing,
+ * so watching one scene again never rewinds the list. A one-episode anime is over as soon as it starts.
+ */
+function rewatchStartChanges(entry: EntryState | undefined, episode: number, total: number | null): ListEntryChanges | null {
+  if (entry?.status !== 'COMPLETED' || episode !== 1) return null;
+  if (total === 1) return { repeat: entry.repeat + 1 };
+  return { status: 'REPEATING', progress: 1 };
+}
+
 export const totalUnits = (media: MediaSummary) => (media.type === 'MANGA' ? media.chapters : media.episodes);
 
-export type WatchResult = 'updated' | 'alreadyWatched';
+export type WatchResult = 'updated' | 'alreadyWatched' | 'rewatchStarted';
 
 class MediaListStore {
   private entries = new SvelteMap<number, ListEntry>();
@@ -109,6 +119,12 @@ class MediaListStore {
   async recordWatched(media: MediaSummary, episode: number): Promise<WatchResult> {
     await this.load(media.type);
     const entry = this.entries.get(media.id);
+    const rewatchStart = rewatchStartChanges(entry, episode, totalUnits(media));
+    if (rewatchStart) {
+      await this.save(media, rewatchStart);
+      return 'rewatchStarted';
+    }
+    // <-- Pendant un rewatch, la progression repart de 1 : l'anime se suit comme à la première fois -->
     if (entry && entry.progress >= episode) return 'alreadyWatched';
     await this.save(media, { progress: episode });
     return 'updated';

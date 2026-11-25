@@ -206,6 +206,8 @@ function asClockReply(value: unknown): ClockReply | null {
 class GroupWatch {
   role = $state<GroupWatchRole>('idle');
   code = $state<string | null>(null);
+  /** What the host calls the session; Discord shows it on invitations. Empty means the default title. */
+  sessionName = $state('');
   isConnecting = $state(false);
   isReconnecting = $state(false);
   /** Host side: the friends in the session. */
@@ -442,9 +444,16 @@ class GroupWatch {
     return { mediaId, episode, title: media.title.userPreferred, coverUrl: media.coverImage.large, positionSeconds, durationSeconds };
   }
 
+  /** Host: names the session on Discord invitations (the host trims and caps it again). */
+  renameSession(name: string): void {
+    if (this.role !== 'hosting' || name === this.sessionName) return;
+    this.sessionName = name;
+    this.updateDiscordSession();
+  }
+
   private updateDiscordSession(): void {
     const code = this.role === 'hosting' ? this.code : null;
-    const details = { code, memberCount: this.friends.length + 1, companionNames: this.companionNames(), watching: this.followedEpisode() };
+    const details = { code, memberCount: this.friends.length + 1, companionNames: this.companionNames(), watching: this.followedEpisode(), sessionName: this.sessionName.trim() || null };
     invoke('discord.setSession', details).catch((error: unknown) =>
       toasts.error(error, 'Impossible de mettre à jour la séance sur Discord'),
     );
@@ -481,6 +490,7 @@ class GroupWatch {
     this.room = null;
     this.role = 'idle';
     this.code = null;
+    this.sessionName = '';
     this.isReconnecting = false;
     this.reconnectAttempt = 0;
     this.friends = [];

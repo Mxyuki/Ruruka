@@ -175,7 +175,9 @@ class Playback {
     current.isWatched = true;
     try {
       const result = await mediaList.recordWatched(current.media, episode);
-      if (result === 'updated') toasts.success(`Épisode ${episode} de ${current.media.title.userPreferred} vu !`);
+      const title = current.media.title.userPreferred;
+      if (result === 'rewatchStarted') toasts.success(`Rewatch de ${title} commencé !`);
+      if (result === 'updated') toasts.success(`Épisode ${episode} de ${title} vu !`);
     } catch (error) {
       toasts.error(error, 'Impossible de mettre à jour ta liste');
     }

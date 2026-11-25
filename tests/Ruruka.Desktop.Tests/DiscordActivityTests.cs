@@ -196,6 +196,38 @@ public class DiscordActivityTests
     }
 
     [Fact]
+    public void OpenSessionShowsItsName()
+    {
+        var payload = Payload(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1, "Group Watch · Precure")));
+
+        Assert.Equal("Group Watch · Precure", payload.GetProperty("details").GetString());
+    }
+
+    [Fact]
+    public void RenamedSessionNeedsAnUpdate()
+    {
+        var shown = DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1, "Avant"));
+
+        Assert.False(DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1, "Après")).LooksLike(shown));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("   ", null)]
+    [InlineData("  Group \n  Watch\t Precure ", "Group Watch Precure")]
+    [InlineData("a\u0007b", "ab")]
+    public void SessionNameIsCleaned(string? raw, string? expected) =>
+        Assert.Equal(expected, DiscordActivity.CleanSessionName(raw));
+
+    [Fact]
+    public void SessionNameIsCappedAtFortyCharacters()
+    {
+        var cleaned = DiscordActivity.CleanSessionName(new string('x', 200));
+
+        Assert.Equal(40, cleaned!.Length);
+    }
+
+    [Fact]
     public void NewFriendInTheSessionNeedsAnUpdate()
     {
         var shown = DiscordActivity.ForOpenSession(new SessionInvite("7KX3P-QM9TZ", 1));

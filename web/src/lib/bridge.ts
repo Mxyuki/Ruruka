@@ -296,7 +296,7 @@ interface BridgeApi {
   'stream.play': [{ mediaId: number; episode: number; title: string; coverUrl: string; fileSize: number; extension: string }, boolean];
   'stream.closeViewer': [void, boolean];
   /** The session as Discord should show it: `code` offers invitations when hosting, `companionNames` are the others in it, `watching` is the episode a friend follows. */
-  'discord.setSession': [{ code: string | null; memberCount: number; companionNames: string[]; watching: SessionEpisode | null }, boolean];
+  'discord.setSession': [{ code: string | null; memberCount: number; companionNames: string[]; watching: SessionEpisode | null; sessionName: string | null }, boolean];
   /** The code of an invitation accepted on this PC, once; null otherwise. */
   'discord.takeJoinCode': [void, string | null];
   /** Host side: lets in someone who asked to join from Discord. */

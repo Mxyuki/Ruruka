@@ -3,8 +3,8 @@ using System.Text;
 
 namespace Ruruka.Desktop.Discord;
 
-/// <summary>The session this PC hosts: friends invited from Discord receive its code.</summary>
-internal sealed record SessionInvite(string Code, int MemberCount);
+/// <summary>The session this PC hosts: friends invited from Discord receive its code. Name is what the host calls it, null for the default.</summary>
+internal sealed record SessionInvite(string Code, int MemberCount, string? Name = null);
 
 /// <summary>Payload of "discord.joinAsked": someone asked to join the hosted session from Discord.</summary>
 internal sealed record JoinAsked(string UserId, string Name);
@@ -32,6 +32,8 @@ internal sealed record DiscordActivity(int MediaId, string Details, string State
     // Discord accepts a join secret on a Watching activity but only offers invitations for Playing.
     private const int PlayingType = 0;
     private const int MaxTextLength = 128;
+    private const int MaxSessionNameLength = 40;
+    private const string DefaultSessionName = "Séance Ruruka";
     private const int MaxImageUrlLength = 256;
     private const string ButtonLabel = "Ouvrir dans Ruruka";
 
@@ -63,7 +65,18 @@ internal sealed record DiscordActivity(int MediaId, string Details, string State
 
     /// <summary>A hosted session with nothing playing, so friends can be invited.</summary>
     public static DiscordActivity ForOpenSession(SessionInvite invite, string? companions = null) =>
-        new(0, "Séance Ruruka", "Séance ouverte", null, null, null, invite, companions);
+        new(0, DiscordText(invite.Name ?? DefaultSessionName), "Séance ouverte", null, null, null, invite, companions);
+
+    /// <summary>A session name made safe for Discord: no control characters, single spaces, at most 40 characters; null when nothing is left.</summary>
+    public static string? CleanSessionName(string? raw)
+    {
+        if (raw is null) return null;
+        var singleLine = string.Join(' ', new string(raw.Where(character => !char.IsControl(character) || char.IsWhiteSpace(character)).ToArray())
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (singleLine.Length > MaxSessionNameLength) singleLine = singleLine[..MaxSessionNameLength].TrimEnd();
+        if (singleLine.Length > 0 && char.IsHighSurrogate(singleLine[^1])) singleLine = singleLine[..^1];
+        return singleLine.Length == 0 ? null : singleLine;
+    }
 
     public static DiscordActivity From(NowWatching watching, DateTimeOffset now, string? companions = null)
     {
